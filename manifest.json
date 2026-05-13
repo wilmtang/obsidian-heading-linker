@@ -1,0 +1,10 @@
+{
+	"id": "heading-link-copy",
+	"name": "Copy Heading Link",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Copy a markdown link to a heading with configurable path and hierarchy.",
+	"author": "wilmtang",
+	"authorUrl": "https://github.com/wilmtang",
+	"isDesktopOnly": true
+}

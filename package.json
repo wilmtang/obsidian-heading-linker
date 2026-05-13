@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-heading-linker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "build": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs --target=node16",
+    "dev": "npm run build -- --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "obsidian": "^1.12.3",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
+  }
+}

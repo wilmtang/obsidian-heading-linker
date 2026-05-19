@@ -14,12 +14,10 @@ import {
 
 interface HeadingLinkSettings {
 	pathFormat: 'relative' | 'full';
-	headingFormat: 'full-path' | 'target-only';
 }
 
 const DEFAULT_SETTINGS: HeadingLinkSettings = {
-	pathFormat: 'relative',
-	headingFormat: 'full-path'
+	pathFormat: 'relative'
 }
 
 export default class HeadingLinkCopierPlugin extends Plugin {
@@ -52,7 +50,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 					menu.addItem((item) => {
 						item.setTitle('Copy markdown link to heading')
 							.setIcon('link')
-							.onClick(() => this.copyHeadingLink(file, targetHeading, cache));
+							.onClick(() => this.copyHeadingLink(file, targetHeading, cache, editor));
 					});
 				}
 			})
@@ -67,7 +65,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	async copyHeadingLink(file: TFile, targetHeading: HeadingCache, cache: CachedMetadata) {
+	async copyHeadingLink(file: TFile, targetHeading: HeadingCache, cache: CachedMetadata, editor: Editor) {
 		// 1. Determine File Path String
 		let pathStr = "";
 		if (this.settings.pathFormat === 'full') {
@@ -76,46 +74,46 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 			pathStr = `./${file.name}`; // e.g., "./file.md"
 		}
 
-		// 2. Determine Heading Path String
-		let headingStr = "";
-		if (this.settings.headingFormat === 'full-path') {
-			const parents = this.getHeadingParents(targetHeading, cache.headings || []);
-			const parentNames = parents.map(h => h.heading);
-			parentNames.push(targetHeading.heading);
-			headingStr = parentNames.join('/');
+		// Encode spaces and special characters for standard Markdown links
+		// Split by '/' so we don't encode the path separators, and then encode each part
+		// This handles '#' and '?' in filenames properly
+		const encodedPath = pathStr.split('/').map(p => encodeURIComponent(p)).join('/');
+
+		// 2. Check for uniqueness and determine fragment
+		const isUnique = cache.headings ? cache.headings.filter(h => h.heading === targetHeading.heading).length === 1 : true;
+
+		let fragment = "";
+		if (isUnique) {
+			// c. if the heading itself is already unique, do things like normal
+			fragment = targetHeading.heading.replace(/ /g, '%20');
 		} else {
-			headingStr = targetHeading.heading;
+			// When copying a heading link, if the heading in the current file is not unique:
+			const lineNum = targetHeading.position.start.line;
+			const lineContent = editor.getLine(lineNum);
+
+			// b. if the heading is already having a html id, copy the id as the link. Don't add another id
+			const idMatch = lineContent.match(/id=['"]([^'"]+)['"]/i);
+
+			if (idMatch && idMatch[1]) {
+				fragment = idMatch[1];
+			} else {
+				// a. edit the markdown so that the heading contains an explicit HTML ID, and use the id as the link
+				const safeHeading = targetHeading.heading.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').toLowerCase();
+				const newId = `${safeHeading}-${Math.random().toString(36).substring(2, 8)}`;
+				const newLineContent = lineContent + ` <a id="${newId}"></a>`;
+				editor.setLine(lineNum, newLineContent);
+				fragment = newId;
+			}
 		}
 
-		// Encode spaces and special characters for standard Markdown links
-		const encodedPath = encodeURI(pathStr);
-		// Obsidian links often use spaces, but strictly speaking, standard URIs need encoding
-		const encodedHeading = headingStr.replace(/ /g, '%20');
-
 		// 3. Assemble Final Markdown Link
+		// the link text should remain the same as the heading itself like before
 		const linkText = targetHeading.heading;
-		const markdownLink = `[${linkText}](${encodedPath}#${encodedHeading})`;
+		const markdownLink = `[${linkText}](${encodedPath}#${fragment})`;
 
 		// 4. Write to Clipboard
 		await navigator.clipboard.writeText(markdownLink);
 		new Notice('Heading link copied to clipboard!');
-	}
-
-	// Helper to traverse backwards and find parent headings based on heading levels
-	getHeadingParents(target: HeadingCache, allHeadings: HeadingCache[]): HeadingCache[] {
-		const parents: HeadingCache[] = [];
-		let currentLevel = target.level;
-		const targetIndex = allHeadings.indexOf(target);
-
-		for (let i = targetIndex - 1; i >= 0; i--) {
-			const h = allHeadings[i];
-			if (h.level < currentLevel) {
-				parents.unshift(h);
-				currentLevel = h.level;
-			}
-			if (currentLevel === 1) break;
-		}
-		return parents;
 	}
 }
 
@@ -142,18 +140,6 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.pathFormat)
 				.onChange(async (value: 'relative' | 'full') => {
 					this.plugin.settings.pathFormat = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Heading Format')
-			.setDesc('Choose whether to include parent headings in the anchor link.')
-			.addDropdown(drop => drop
-				.addOption('full-path', 'Full Path (Parent/Child/Target)')
-				.addOption('target-only', 'Target Only (Target)')
-				.setValue(this.plugin.settings.headingFormat)
-				.onChange(async (value: 'full-path' | 'target-only') => {
-					this.plugin.settings.headingFormat = value;
 					await this.plugin.saveSettings();
 				}));
 	}

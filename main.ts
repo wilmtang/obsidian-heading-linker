@@ -2,6 +2,7 @@ import {
 	App,
 	Editor,
 	MarkdownView,
+	MarkdownFileInfo,
 	Menu,
 	Modal,
 	Notice,
@@ -25,7 +26,7 @@ const DEFAULT_SETTINGS: HeadingLinkSettings = {
 }
 
 export default class HeadingLinkCopierPlugin extends Plugin {
-	settings: HeadingLinkSettings;
+	settings!: HeadingLinkSettings;
 
 	async onload() {
 		await this.loadSettings();
@@ -35,7 +36,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 
 		// Registers the right-click menu event in the Markdown Editor
 		this.registerEvent(
-			this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, view: MarkdownView) => {
+			this.app.workspace.on('editor-menu', (menu: Menu, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
 				const file = view.file;
 				if (!file) return;
 
@@ -385,7 +386,7 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 		for (const f of filesToSearch) {
 			try {
 				const content = await this.app.vault.cachedRead(f);
-				const lines = content.split('\\n');
+				const lines = content.split('\n');
 
 				for (let i = 0; i < lines.length; i++) {
 					const line = lines[i];
@@ -415,8 +416,8 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 
 	getSuggestions(query: string): HeadingReference[] {
 		const lowerQuery = query.toLowerCase();
-		return this.suggestions.filter(ref => 
-			ref.file.path.toLowerCase().includes(lowerQuery) || 
+		return this.suggestions.filter(ref =>
+			ref.file.path.toLowerCase().includes(lowerQuery) ||
 			ref.lineText.toLowerCase().includes(lowerQuery)
 		);
 	}
@@ -453,8 +454,8 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 				.addOption('relative', 'Relative (./filename.md)')
 				.addOption('full', 'Full (folder/filename.md)')
 				.setValue(this.plugin.settings.pathFormat)
-				.onChange(async (value: 'relative' | 'full') => {
-					this.plugin.settings.pathFormat = value;
+				.onChange(async (value: string) => {
+					this.plugin.settings.pathFormat = value as 'relative' | 'full';
 					await this.plugin.saveSettings();
 				}));
 
@@ -466,8 +467,8 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 				.addOption('folder', 'Current folder only')
 				.addOption('file', 'Current file only')
 				.setValue(this.plugin.settings.renameScope)
-				.onChange(async (value: 'vault' | 'folder' | 'file') => {
-					this.plugin.settings.renameScope = value;
+				.onChange(async (value: string) => {
+					this.plugin.settings.renameScope = value as 'vault' | 'folder' | 'file';
 					await this.plugin.saveSettings();
 				}));
 	}

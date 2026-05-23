@@ -1,3 +1,4 @@
 node_modules/
 main.js
 .DS_Store
+local_install_copy.sh

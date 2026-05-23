@@ -3,6 +3,7 @@ import {
 	Editor,
 	MarkdownView,
 	Menu,
+	Modal,
 	Notice,
 	Plugin,
 	PluginSettingTab,
@@ -14,10 +15,12 @@ import {
 
 interface HeadingLinkSettings {
 	pathFormat: 'relative' | 'full';
+	renameScope: 'vault' | 'folder' | 'file';
 }
 
 const DEFAULT_SETTINGS: HeadingLinkSettings = {
-	pathFormat: 'relative'
+	pathFormat: 'relative',
+	renameScope: 'vault'
 }
 
 export default class HeadingLinkCopierPlugin extends Plugin {
@@ -51,6 +54,14 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 						item.setTitle('Copy markdown link to heading')
 							.setIcon('link')
 							.onClick(() => this.copyHeadingLink(file, targetHeading, cache, editor));
+					});
+
+					menu.addItem((item) => {
+						item.setTitle('Rename heading')
+							.setIcon('pencil')
+							.onClick(() => {
+								new RenameHeadingModal(this.app, this, file, targetHeading, editor).open();
+							});
 					});
 				}
 			})
@@ -117,6 +128,193 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 	}
 }
 
+/**
+ * Escapes special regex characters in a string so it can be used as a literal in a RegExp.
+ */
+function escapeRegex(str: string): string {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+class RenameHeadingModal extends Modal {
+	plugin: HeadingLinkCopierPlugin;
+	file: TFile;
+	heading: HeadingCache;
+	editor: Editor;
+	newName: string;
+
+	constructor(app: App, plugin: HeadingLinkCopierPlugin, file: TFile, heading: HeadingCache, editor: Editor) {
+		super(app);
+		this.plugin = plugin;
+		this.file = file;
+		this.heading = heading;
+		this.editor = editor;
+		this.newName = heading.heading;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		this.setTitle('Rename heading');
+
+		new Setting(contentEl)
+			.setName('New heading name')
+			.addText((text) => {
+				text.setValue(this.heading.heading);
+				text.onChange((value) => { this.newName = value; });
+				text.inputEl.select();
+				text.inputEl.style.width = '100%';
+				text.inputEl.addEventListener('keydown', (e) => {
+					if (e.key === 'Enter') { e.preventDefault(); this.doRename(); }
+				});
+			});
+
+		new Setting(contentEl)
+			.addButton((btn) => btn
+				.setButtonText('Rename')
+				.setCta()
+				.onClick(() => this.doRename()))
+			.addButton((btn) => btn
+				.setButtonText('Cancel')
+				.onClick(() => this.close()));
+	}
+
+	async doRename() {
+		const newName = this.newName.trim();
+		const oldName = this.heading.heading;
+
+		// Validate
+		if (!newName) {
+			new Notice('Heading name cannot be empty.');
+			return;
+		}
+		if (newName === oldName) {
+			this.close();
+			return;
+		}
+
+		// Step 1: Rename the heading in the current file
+		const lineNum = this.heading.position.start.line;
+		const lineContent = this.editor.getLine(lineNum);
+
+		// Preserve the heading prefix (e.g. "## ") and any trailing <a id="..."> tag
+		const headingPrefixMatch = lineContent.match(/^(#{1,6})\s+/);
+		if (!headingPrefixMatch) {
+			new Notice('Could not parse heading line.');
+			return;
+		}
+		const prefix = headingPrefixMatch[0]; // e.g. "## "
+
+		// Check for trailing <a id="..."> tag and update it if present
+		const trailingAnchorMatch = lineContent.match(/(\s*<a\s+id=["'])([^"']+)(["']\s*>\s*<\/a>\s*)$/);
+		let newLine: string;
+		if (trailingAnchorMatch) {
+			// Update the id attribute to match the new heading
+			const safeNewHeading = newName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').toLowerCase();
+			const oldId = trailingAnchorMatch[2];
+			// Preserve the random suffix if it exists
+			const suffixMatch = oldId.match(/-([a-z0-9]{6})$/);
+			const suffix = suffixMatch ? `-${suffixMatch[1]}` : '';
+			const newId = `${safeNewHeading}${suffix}`;
+			newLine = `${prefix}${newName}${trailingAnchorMatch[1]}${newId}${trailingAnchorMatch[3]}`;
+		} else {
+			newLine = `${prefix}${newName}`;
+		}
+		this.editor.setLine(lineNum, newLine);
+
+		// Step 2: Determine files in scope
+		const scope = this.plugin.settings.renameScope;
+		let filesToSearch: TFile[];
+
+		if (scope === 'file') {
+			filesToSearch = [this.file];
+		} else if (scope === 'folder') {
+			const currentFolder = this.file.parent?.path ?? '';
+			filesToSearch = this.app.vault.getMarkdownFiles().filter(f =>
+				(f.parent?.path ?? '') === currentFolder
+			);
+		} else {
+			// vault
+			filesToSearch = this.app.vault.getMarkdownFiles();
+		}
+
+		// Step 3: Build regex patterns for the old heading
+		const escapedOld = escapeRegex(oldName);
+		const escapedOldEncoded = escapeRegex(oldName.replace(/ /g, '%20'));
+		const escapedNew = newName;
+		const escapedNewEncoded = newName.replace(/ /g, '%20');
+
+		// Wikilinks: [[...#OldHeading]] and [[...#OldHeading|alias]]
+		const wikiLinkRegex = new RegExp(
+			`(\\[\\[[^\\]]*?#)${escapedOld}(\\]\\]|\\|)`, 'g'
+		);
+		// Standard markdown links: [...](path#OldHeading) — heading may be URL-encoded
+		const mdLinkRegex = new RegExp(
+			`(\\]\\([^)]*?#)${escapedOldEncoded}(\\))`, 'g'
+		);
+		// HTML links: href="path#OldHeading" or href='path#OldHeading'
+		const htmlLinkRegex = new RegExp(
+			`(href=["'][^"']*?#)${escapedOldEncoded}(["'])`, 'g'
+		);
+
+		// Step 4: Search and replace in each file
+		let totalLinks = 0;
+		let totalFiles = 0;
+		const affectedFiles: string[] = [];
+
+		for (const f of filesToSearch) {
+			// Skip the current file for vault.process — we already edited it via editor
+			// but we still need to update links within the current file
+			try {
+				let fileLinksUpdated = 0;
+				await this.app.vault.process(f, (data) => {
+					let newData = data;
+
+					// Replace wikilinks
+					newData = newData.replace(wikiLinkRegex, (match, before, after) => {
+						fileLinksUpdated++;
+						return `${before}${escapedNew}${after}`;
+					});
+
+					// Replace markdown links
+					newData = newData.replace(mdLinkRegex, (match, before, after) => {
+						fileLinksUpdated++;
+						return `${before}${escapedNewEncoded}${after}`;
+					});
+
+					// Replace HTML links
+					newData = newData.replace(htmlLinkRegex, (match, before, after) => {
+						fileLinksUpdated++;
+						return `${before}${escapedNewEncoded}${after}`;
+					});
+
+					return newData;
+				});
+
+				if (fileLinksUpdated > 0) {
+					totalLinks += fileLinksUpdated;
+					totalFiles++;
+					affectedFiles.push(`${f.path} (${fileLinksUpdated} link${fileLinksUpdated > 1 ? 's' : ''})`);
+				}
+			} catch (err) {
+				console.error(`Heading rename: failed to process ${f.path}`, err);
+			}
+		}
+
+		// Step 5: Show results
+		if (totalLinks > 0) {
+			const summary = `Renamed heading. Updated ${totalLinks} link${totalLinks > 1 ? 's' : ''} across ${totalFiles} file${totalFiles > 1 ? 's' : ''}:\n${affectedFiles.join('\n')}`;
+			new Notice(summary, 8000);
+		} else {
+			new Notice('Heading renamed. No links to update.');
+		}
+
+		this.close();
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
+}
+
 class HeadingLinkSettingTab extends PluginSettingTab {
 	plugin: HeadingLinkCopierPlugin;
 
@@ -140,6 +338,19 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.pathFormat)
 				.onChange(async (value: 'relative' | 'full') => {
 					this.plugin.settings.pathFormat = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Rename Scope')
+			.setDesc('When renaming a heading, search and update links in:')
+			.addDropdown(drop => drop
+				.addOption('vault', 'Entire vault')
+				.addOption('folder', 'Current folder only')
+				.addOption('file', 'Current file only')
+				.setValue(this.plugin.settings.renameScope)
+				.onChange(async (value: 'vault' | 'folder' | 'file') => {
+					this.plugin.settings.renameScope = value;
 					await this.plugin.saveSettings();
 				}));
 	}

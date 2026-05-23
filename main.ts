@@ -57,7 +57,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 					});
 
 					menu.addItem((item) => {
-						item.setTitle('Rename heading')
+						item.setTitle('Rename this heading...')
 							.setIcon('pencil')
 							.onClick(() => {
 								new RenameHeadingModal(this.app, this, file, targetHeading, editor).open();

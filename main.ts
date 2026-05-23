@@ -8,6 +8,7 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	SuggestModal,
 	TFile,
 	HeadingCache,
 	CachedMetadata
@@ -61,6 +62,14 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 							.setIcon('pencil')
 							.onClick(() => {
 								new RenameHeadingModal(this.app, this, file, targetHeading, editor).open();
+							});
+					});
+
+					menu.addItem((item) => {
+						item.setTitle('Find heading references...')
+							.setIcon('search')
+							.onClick(() => {
+								new FindReferencesModal(this.app, this, file, targetHeading).open();
 							});
 					});
 				}
@@ -312,6 +321,114 @@ class RenameHeadingModal extends Modal {
 
 	onClose() {
 		this.contentEl.empty();
+	}
+}
+
+interface HeadingReference {
+	file: TFile;
+	lineNum: number;
+	lineText: string;
+}
+
+class FindReferencesModal extends SuggestModal<HeadingReference> {
+	plugin: HeadingLinkCopierPlugin;
+	file: TFile;
+	heading: HeadingCache;
+	suggestions: HeadingReference[] = [];
+
+	constructor(app: App, plugin: HeadingLinkCopierPlugin, file: TFile, heading: HeadingCache) {
+		super(app);
+		this.plugin = plugin;
+		this.file = file;
+		this.heading = heading;
+		this.setInstructions([
+			{ command: '↑↓', purpose: 'to navigate' },
+			{ command: '↵', purpose: 'to open file' },
+			{ command: 'esc', purpose: 'to dismiss' }
+		]);
+	}
+
+	async open() {
+		await this.findReferences();
+		if (this.suggestions.length > 0) {
+			this.setPlaceholder(`Found ${this.suggestions.length} reference(s). Type to filter...`);
+			super.open();
+		}
+	}
+
+	async findReferences() {
+		const oldName = this.heading.heading;
+		const scope = this.plugin.settings.renameScope;
+		let filesToSearch: TFile[];
+
+		if (scope === 'file') {
+			filesToSearch = [this.file];
+		} else if (scope === 'folder') {
+			const currentFolder = this.file.parent?.path ?? '';
+			filesToSearch = this.app.vault.getMarkdownFiles().filter(f =>
+				(f.parent?.path ?? '') === currentFolder
+			);
+		} else {
+			// vault
+			filesToSearch = this.app.vault.getMarkdownFiles();
+		}
+
+		const escapedOld = escapeRegex(oldName);
+		const escapedOldEncoded = escapeRegex(oldName.replace(/ /g, '%20'));
+
+		const wikiLinkRegex = new RegExp(`(\\[\\[[^\\]]*?#)${escapedOld}(\\]\\]|\\|)`, 'g');
+		const mdLinkRegex = new RegExp(`(\\]\\([^)]*?#)${escapedOldEncoded}(\\))`, 'g');
+		const htmlLinkRegex = new RegExp(`(href=["'][^"']*?#)${escapedOldEncoded}(["'])`, 'g');
+
+		const newSuggestions: HeadingReference[] = [];
+
+		for (const f of filesToSearch) {
+			try {
+				const content = await this.app.vault.cachedRead(f);
+				const lines = content.split('\\n');
+
+				for (let i = 0; i < lines.length; i++) {
+					const line = lines[i];
+					wikiLinkRegex.lastIndex = 0;
+					mdLinkRegex.lastIndex = 0;
+					htmlLinkRegex.lastIndex = 0;
+
+					if (wikiLinkRegex.test(line) || mdLinkRegex.test(line) || htmlLinkRegex.test(line)) {
+						newSuggestions.push({
+							file: f,
+							lineNum: i,
+							lineText: line.trim()
+						});
+					}
+				}
+			} catch (err) {
+				console.error(`Heading search: failed to read ${f.path}`, err);
+			}
+		}
+
+		this.suggestions = newSuggestions;
+
+		if (this.suggestions.length === 0) {
+			new Notice(`No references found for "${oldName}".`);
+		}
+	}
+
+	getSuggestions(query: string): HeadingReference[] {
+		const lowerQuery = query.toLowerCase();
+		return this.suggestions.filter(ref => 
+			ref.file.path.toLowerCase().includes(lowerQuery) || 
+			ref.lineText.toLowerCase().includes(lowerQuery)
+		);
+	}
+
+	renderSuggestion(ref: HeadingReference, el: HTMLElement) {
+		el.createEl('div', { text: ref.file.path });
+		el.createEl('small', { text: `Line ${ref.lineNum + 1}: ${ref.lineText}`, attr: { style: 'color: var(--text-muted);' } });
+	}
+
+	onChooseSuggestion(ref: HeadingReference, evt: MouseEvent | KeyboardEvent) {
+		const leaf = this.app.workspace.getLeaf(false);
+		leaf.openFile(ref.file, { eState: { line: ref.lineNum } });
 	}
 }
 

@@ -70,7 +70,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 						item.setTitle('Find heading references...')
 							.setIcon('search')
 							.onClick(() => {
-								new FindReferencesModal(this.app, this, file, targetHeading).open();
+								new FindReferencesModal(this.app, this, file, targetHeading, editor).open();
 							});
 					});
 				}
@@ -342,24 +342,35 @@ interface HeadingReference {
 	linesAfter: string[];
 	matchStartIndex: number;
 	matchEndIndex: number;
+	contextHeading: string | null;
 }
 
 class FindReferencesModal extends SuggestModal<HeadingReference> {
 	plugin: HeadingLinkCopierPlugin;
 	file: TFile;
 	heading: HeadingCache;
+	editor: Editor;
 	suggestions: HeadingReference[] = [];
 
-	constructor(app: App, plugin: HeadingLinkCopierPlugin, file: TFile, heading: HeadingCache) {
+	constructor(app: App, plugin: HeadingLinkCopierPlugin, file: TFile, heading: HeadingCache, editor: Editor) {
 		super(app);
 		this.plugin = plugin;
 		this.file = file;
 		this.heading = heading;
+		this.editor = editor;
 		this.setInstructions([
 			{ command: '↑↓', purpose: 'to navigate' },
 			{ command: '↵', purpose: 'to open file' },
+			{ command: 'shift + ↵', purpose: 'to rename heading' },
 			{ command: 'esc', purpose: 'to dismiss' }
 		]);
+
+		this.scope.register(['Shift'], 'Enter', (evt: KeyboardEvent) => {
+			evt.preventDefault();
+			this.close();
+			new RenameHeadingModal(this.app, this.plugin, this.file, this.heading, this.editor).open();
+			return false;
+		});
 	}
 
 	async open() {
@@ -402,8 +413,15 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 				const content = await this.app.vault.cachedRead(f);
 				const lines = content.split(/\r\n|[\n\v\f\r\x85\u2028\u2029]/);
 
+				let currentHeading: string | null = null;
+
 				for (let i = 0; i < lines.length; i++) {
 					const line = lines[i];
+					const headingMatch = line.match(/^#+\s+(.*)/);
+					if (headingMatch) {
+						currentHeading = headingMatch[1];
+					}
+
 					const matchData: {start: number, end: number}[] = [];
 					let match;
 					
@@ -427,10 +445,8 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 						if (i > 0) linesBefore.push(lines[i - 1]);
 						
 						const linesAfter = [];
-						for (let offset = 1; offset <= 3; offset++) {
-							if (i + offset < lines.length) {
-								linesAfter.push(lines[i + offset]);
-							}
+						if (i + 1 < lines.length) {
+							linesAfter.push(lines[i + 1]);
 						}
 
 						newSuggestions.push({
@@ -440,7 +456,8 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 							linesBefore,
 							linesAfter,
 							matchStartIndex: m.start,
-							matchEndIndex: m.end
+							matchEndIndex: m.end,
+							contextHeading: currentHeading
 						});
 					}
 				}
@@ -465,7 +482,12 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 	}
 
 	renderSuggestion(ref: HeadingReference, el: HTMLElement) {
-		el.createEl('div', { text: ref.file.path, attr: { style: 'font-weight: 600; margin-bottom: 4px; color: var(--text-accent);' } });
+		const titleEl = el.createEl('div', { attr: { style: 'margin-bottom: 4px;' } });
+		titleEl.createEl('span', { text: ref.file.basename, attr: { style: 'font-weight: 600; color: var(--text-accent);' } });
+		if (ref.contextHeading) {
+			titleEl.createEl('span', { text: ' - ', attr: { style: 'color: var(--text-muted); margin: 0 4px;' } });
+			titleEl.createEl('span', { text: ref.contextHeading, attr: { style: 'font-style: italic; color: var(--text-normal); background-color: var(--background-secondary); padding: 0 4px; border-radius: 4px; font-size: 0.9em;' } });
+		}
 		
 		const contextEl = el.createEl('div', { attr: { style: 'font-size: 0.85em; line-height: 1.4;' } });
 		

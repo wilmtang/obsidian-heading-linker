@@ -14,7 +14,8 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
 - 📝 **Safe Renaming**: Right-click a heading and select "Rename this heading...". The plugin will safely rename the heading and instantly update every single link pointing to it (Wiki, Markdown, and HTML links) across your file, folder, or entire vault. It even intelligently updates display aliases that match the old heading name.
 - 🔎 **Find References**: Need to know everywhere a heading is mentioned? Click "Find heading references..." to open a beautifully formatted search modal. See the exact context of each mention and jump straight to the source.
 - ⚡ **Lightning Fast Refactor**: Press `Shift + Enter` right inside the "Find References" modal to instantly rename the heading and all its references across your vault!
-- ⚙️ **Configurable Link Paths**: Choose between relative paths (`./Note.md`) or full vault paths (`Folder/Sub/Note.md`).
+- ⚙️ **Customizable Settings**: Choose between relative or full vault link paths, and configure the default scope for renaming headings (Entire Vault, Current Folder, or Current File).
+- ⌨️ **Keyboard Shortcuts (Hotkeys)**: Bind custom keyboard shortcuts for all three commands (Copy, Rename, and Find References) that trigger only when editing a heading line!
 
 ## 🛠️ How to Use
 
@@ -35,6 +36,26 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
    
    <br>
    <img src="images/search-references.png" alt="Find References Modal" width="600">
+
+## ⚙️ Configuration & Hotkeys
+
+### Keyboard Shortcuts (Hotkeys)
+By default, the plugin registers commands without default keyboard shortcuts so they don't conflict with your existing setup. You can assign your own custom shortcuts in Obsidian:
+1. Open Obsidian **Settings** and navigate to **Hotkeys**.
+2. Search for `Heading Linker & Refactor`.
+3. Click the blank button next to a command to record a key combination for:
+   - `Copy Markdown Link`
+   - `Rename this Heading`
+   - `Find Heading References`
+
+> [!NOTE]
+> To prevent accidental triggers, these keyboard shortcuts are context-sensitive. They will **only trigger when your cursor is positioned directly on a heading line**. If you press the shortcut while the cursor is anywhere else in the document, the command will silently do nothing.
+
+### Settings Tab
+Navigate to **Settings > Heading Linker & Refactor** to customize the default behavior:
+- **File Path Format**: Choose whether generated links use relative paths (`./filename.md`) or full vault paths (`folder/filename.md`).
+- **Rename Scope**: Set the default search scope when renaming a heading (search and replace in the **Entire vault**, **Current folder only**, or **Current file only**).
+
 ## 📥 Installation
 
 ### From Obsidian Community Plugins (Coming Soon)

@@ -41,15 +41,9 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 				if (!file) return;
 
 				const cache = this.app.metadataCache.getFileCache(file);
-				if (!cache || !cache.headings) return;
+				if (!cache) return;
 
-				const cursor = editor.getCursor();
-
-				// Check if the cursor is currently on a heading
-				const targetHeading = cache.headings.find(h =>
-					cursor.line >= h.position.start.line &&
-					cursor.line <= h.position.end.line
-				);
+				const targetHeading = this.getTargetHeading(view, editor);
 
 				if (targetHeading) {
 					menu.addItem((item) => {
@@ -76,6 +70,66 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 				}
 			})
 		);
+
+		// Register Commands (Unset shortcuts by default)
+		this.addCommand({
+			id: 'copy-markdown-link',
+			name: 'Copy Markdown Link',
+			editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				const targetHeading = this.getTargetHeading(view, editor);
+				if (targetHeading) {
+					if (!checking && view.file) {
+						this.copyHeadingLink(view.file, targetHeading, this.app.metadataCache.getFileCache(view.file)!, editor);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		this.addCommand({
+			id: 'rename-heading',
+			name: 'Rename this Heading',
+			editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				const targetHeading = this.getTargetHeading(view, editor);
+				if (targetHeading) {
+					if (!checking && view.file) {
+						new RenameHeadingModal(this.app, this, view.file, targetHeading, editor).open();
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		this.addCommand({
+			id: 'find-heading-references',
+			name: 'Find Heading References',
+			editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+				const targetHeading = this.getTargetHeading(view, editor);
+				if (targetHeading) {
+					if (!checking && view.file) {
+						new FindReferencesModal(this.app, this, view.file, targetHeading, editor).open();
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+	}
+
+	getTargetHeading(view: MarkdownView | MarkdownFileInfo, editor: Editor): HeadingCache | null {
+		const file = view.file;
+		if (!file) return null;
+
+		const cache = this.app.metadataCache.getFileCache(file);
+		if (!cache || !cache.headings) return null;
+
+		const cursor = editor.getCursor();
+		return cache.headings.find(h =>
+			cursor.line >= h.position.start.line &&
+			cursor.line <= h.position.end.line
+		) || null;
 	}
 
 	async loadSettings() {

@@ -19,12 +19,22 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
 ## 🛠️ How to Use
 
 1. Open any markdown file in Obsidian.
-2. Right-click on any heading in the editor.
-3. Choose one of the new options:
-   - **Copy markdown link to heading**
-   - **Rename this heading...**
-   - **Find heading references...**
+2. Right-click on any heading in the editor to open the context menu.
 
+<img src="images/context-menu.png" alt="Context Menu" width="300">
+
+3. Choose one of the new options:
+   - **Copy markdown link to heading**: Instantly copies a reliable markdown link to your clipboard.
+   
+   - **Rename this heading...**: Opens a modal to safely rename the heading across your entire vault.
+   
+   <br>
+   <img src="images/rename-modal.png" alt="Rename Heading Modal" width="450">
+   
+   - **Find heading references...**: Opens a beautifully formatted search modal to see the exact context of each mention and jump straight to the source.
+   
+   <br>
+   <img src="images/search-references.png" alt="Find References Modal" width="600">
 ## 📥 Installation
 
 ### From Obsidian Community Plugins (Coming Soon)

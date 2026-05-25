@@ -1,7 +1,7 @@
 {
   "name": "obsidian-heading-linker",
   "version": "1.0.5",
-  "description": "",
+  "description": "A comprehensive heading utility: Copy markdown links to headings, safely rename headings (refactor), and search for heading references.",
   "main": "main.js",
   "scripts": {
     "build": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs --target=node16",

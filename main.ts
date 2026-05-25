@@ -254,15 +254,15 @@ class RenameHeadingModal extends Modal {
 
 		// Wikilinks: [[...#OldHeading]] and [[...#OldHeading|alias]]
 		const wikiLinkRegex = new RegExp(
-			`(\\[\\[[^\\]]*?#)${escapedOld}(\\]\\]|\\|)`, 'g'
+			`(\\[\\[[^\\]]*?#)${escapedOld}((?:\\]\\])|(?:\\|([^\\]]*)\\]\\]))`, 'g'
 		);
-		// Standard markdown links: [...](path#OldHeading) — heading may be URL-encoded
+		// Standard markdown links: [alias](path#OldHeading) — heading may be URL-encoded
 		const mdLinkRegex = new RegExp(
-			`(\\]\\([^)]*?#)${escapedOldEncoded}(\\))`, 'g'
+			`\\[([^\\]]*)\\]\\(([^)]*?#)${escapedOldEncoded}\\)`, 'g'
 		);
-		// HTML links: href="path#OldHeading" or href='path#OldHeading'
+		// HTML links: <a href="path#OldHeading">alias</a>
 		const htmlLinkRegex = new RegExp(
-			`(href=["'][^"']*?#)${escapedOldEncoded}(["'])`, 'g'
+			`(<a[^>]*?href=["'][^"']*?#)${escapedOldEncoded}(["'][^>]*>)([^<]*)(</a>)`, 'g'
 		);
 
 		// Step 4: Search and replace in each file
@@ -279,21 +279,30 @@ class RenameHeadingModal extends Modal {
 					let newData = data;
 
 					// Replace wikilinks
-					newData = newData.replace(wikiLinkRegex, (match, before, after) => {
+					newData = newData.replace(wikiLinkRegex, (match, before, after, alias) => {
 						fileLinksUpdated++;
+						if (alias === oldName) {
+							return `${before}${escapedNew}|${escapedNew}]]`;
+						}
 						return `${before}${escapedNew}${after}`;
 					});
 
 					// Replace markdown links
-					newData = newData.replace(mdLinkRegex, (match, before, after) => {
+					newData = newData.replace(mdLinkRegex, (match, alias, pathAndHash) => {
 						fileLinksUpdated++;
-						return `${before}${escapedNewEncoded}${after}`;
+						if (alias === oldName) {
+							return `[${escapedNew}](${pathAndHash}${escapedNewEncoded})`;
+						}
+						return `[${alias}](${pathAndHash}${escapedNewEncoded})`;
 					});
 
 					// Replace HTML links
-					newData = newData.replace(htmlLinkRegex, (match, before, after) => {
+					newData = newData.replace(htmlLinkRegex, (match, beforeHref, afterHref, alias, endTag) => {
 						fileLinksUpdated++;
-						return `${before}${escapedNewEncoded}${after}`;
+						if (alias === oldName) {
+							return `${beforeHref}${escapedNewEncoded}${afterHref}${escapedNew}${endTag}`;
+						}
+						return `${beforeHref}${escapedNewEncoded}${afterHref}${alias}${endTag}`;
 					});
 
 					return newData;
@@ -329,6 +338,10 @@ interface HeadingReference {
 	file: TFile;
 	lineNum: number;
 	lineText: string;
+	linesBefore: string[];
+	linesAfter: string[];
+	matchStartIndex: number;
+	matchEndIndex: number;
 }
 
 class FindReferencesModal extends SuggestModal<HeadingReference> {
@@ -352,7 +365,8 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 	async open() {
 		await this.findReferences();
 		if (this.suggestions.length > 0) {
-			this.setPlaceholder(`Found ${this.suggestions.length} reference(s). Type to filter...`);
+			const scope = this.plugin.settings.renameScope;
+			this.setPlaceholder(`Found ${this.suggestions.length} reference(s) in ${scope} scope. Type to filter...`);
 			super.open();
 		}
 	}
@@ -377,28 +391,56 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 		const escapedOld = escapeRegex(oldName);
 		const escapedOldEncoded = escapeRegex(oldName.replace(/ /g, '%20'));
 
-		const wikiLinkRegex = new RegExp(`(\\[\\[[^\\]]*?#)${escapedOld}(\\]\\]|\\|)`, 'g');
-		const mdLinkRegex = new RegExp(`(\\]\\([^)]*?#)${escapedOldEncoded}(\\))`, 'g');
-		const htmlLinkRegex = new RegExp(`(href=["'][^"']*?#)${escapedOldEncoded}(["'])`, 'g');
+		const wikiLinkRegex = new RegExp(`(\\[\\[[^\\]]*?#)${escapedOld}((?:\\]\\])|(?:\\|([^\\]]*)\\]\\]))`, 'g');
+		const mdLinkRegex = new RegExp(`\\[([^\\]]*)\\]\\(([^)]*?#)${escapedOldEncoded}\\)`, 'g');
+		const htmlLinkRegex = new RegExp(`(<a[^>]*?href=["'][^"']*?#)${escapedOldEncoded}(["'][^>]*>)([^<]*)(</a>)`, 'g');
 
 		const newSuggestions: HeadingReference[] = [];
 
 		for (const f of filesToSearch) {
 			try {
 				const content = await this.app.vault.cachedRead(f);
-				const lines = content.split('\n');
+				const lines = content.split(/\r\n|[\n\v\f\r\x85\u2028\u2029]/);
 
 				for (let i = 0; i < lines.length; i++) {
 					const line = lines[i];
+					const matchData: {start: number, end: number}[] = [];
+					let match;
+					
 					wikiLinkRegex.lastIndex = 0;
+					while ((match = wikiLinkRegex.exec(line)) !== null) {
+						matchData.push({ start: match.index, end: match.index + match[0].length });
+					}
+					
 					mdLinkRegex.lastIndex = 0;
+					while ((match = mdLinkRegex.exec(line)) !== null) {
+						matchData.push({ start: match.index, end: match.index + match[0].length });
+					}
+					
 					htmlLinkRegex.lastIndex = 0;
+					while ((match = htmlLinkRegex.exec(line)) !== null) {
+						matchData.push({ start: match.index, end: match.index + match[0].length });
+					}
 
-					if (wikiLinkRegex.test(line) || mdLinkRegex.test(line) || htmlLinkRegex.test(line)) {
+					for (const m of matchData) {
+						const linesBefore = [];
+						if (i > 0) linesBefore.push(lines[i - 1]);
+						
+						const linesAfter = [];
+						for (let offset = 1; offset <= 3; offset++) {
+							if (i + offset < lines.length) {
+								linesAfter.push(lines[i + offset]);
+							}
+						}
+
 						newSuggestions.push({
 							file: f,
 							lineNum: i,
-							lineText: line.trim()
+							lineText: line,
+							linesBefore,
+							linesAfter,
+							matchStartIndex: m.start,
+							matchEndIndex: m.end
 						});
 					}
 				}
@@ -423,8 +465,31 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 	}
 
 	renderSuggestion(ref: HeadingReference, el: HTMLElement) {
-		el.createEl('div', { text: ref.file.path });
-		el.createEl('small', { text: `Line ${ref.lineNum + 1}: ${ref.lineText}`, attr: { style: 'color: var(--text-muted);' } });
+		el.createEl('div', { text: ref.file.path, attr: { style: 'font-weight: 600; margin-bottom: 4px; color: var(--text-accent);' } });
+		
+		const contextEl = el.createEl('div', { attr: { style: 'font-size: 0.85em; line-height: 1.4;' } });
+		
+		for (const line of ref.linesBefore) {
+			contextEl.createEl('div', { text: line, attr: { style: 'color: var(--text-muted); opacity: 0.7; white-space: pre-wrap;' } });
+		}
+		
+		const lineEl = contextEl.createEl('div', { attr: { style: 'color: var(--text-normal); white-space: pre-wrap;' } });
+		
+		const beforeMatch = ref.lineText.substring(0, ref.matchStartIndex);
+		const theMatch = ref.lineText.substring(ref.matchStartIndex, ref.matchEndIndex);
+		const afterMatch = ref.lineText.substring(ref.matchEndIndex);
+		
+		if (beforeMatch.length > 0) {
+			lineEl.appendChild(document.createTextNode(beforeMatch));
+		}
+		lineEl.createEl('mark', { text: theMatch, attr: { style: 'color: var(--text-normal); background-color: var(--text-selection); border-radius: 2px;' } });
+		if (afterMatch.length > 0) {
+			lineEl.appendChild(document.createTextNode(afterMatch));
+		}
+		
+		for (const line of ref.linesAfter) {
+			contextEl.createEl('div', { text: line, attr: { style: 'color: var(--text-muted); opacity: 0.7; white-space: pre-wrap;' } });
+		}
 	}
 
 	onChooseSuggestion(ref: HeadingReference, evt: MouseEvent | KeyboardEvent) {

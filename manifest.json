@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-heading-linker",
 	"name": "Copy Heading Link",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"minAppVersion": "0.15.0",
 	"description": "Copy a markdown link to a heading with configurable path and hierarchy.",
 	"author": "wilmtang",

@@ -133,7 +133,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<HeadingLinkSettings> | null);
 	}
 
 	async saveSettings() {
@@ -586,7 +586,9 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Heading Link Copier Settings' });
+		new Setting(containerEl)
+			.setName('Heading Link Copier Settings')
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName('File Path Format')

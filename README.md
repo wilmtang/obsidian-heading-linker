@@ -60,8 +60,9 @@ Navigate to **Settings > Heading Linker & Refactor** to customize the default be
 
 ## 📥 Installation
 
-### From Obsidian Community Plugins (Coming Soon)
-*(Instructions for community plugin installation will go here once approved!)*
+### From Obsidian Community Plugins
+You can install this plugin directly from the Obsidian Community Plugins store:
+[Heading Linker & Refactor](https://community.obsidian.md/plugins/heading-link-copy)
 
 ### Manual Installation
 1. Download the latest release (`main.js` and `manifest.json`) from the [Releases](https://github.com/wilmtang/obsidian-heading-linker/releases) page.

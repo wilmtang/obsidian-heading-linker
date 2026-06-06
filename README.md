@@ -12,7 +12,7 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
 
 ## ✨ Features
 
-- 🔗 **Smart Linking**: Right-click any heading to copy a markdown link to it. If you have duplicate headings in the same file, the plugin automatically generates and inserts a unique HTML anchor (e.g., `<a id="...">`) so your link never points to the wrong place!
+- 🔗 **Smart Linking**: Right-click any heading to copy a markdown link to it. If you have duplicate headings in the same file, the plugin automatically generates and inserts a stable target. Obsidian block IDs (e.g., `^heading-id`) are the default, with legacy HTML anchors (e.g., `<a id="...">`) available as a compatibility option.
 - 📝 **Safe Renaming**: Right-click a heading and select "Rename this heading...". The plugin will safely rename the heading and instantly update every single link pointing to it (Wiki, Markdown, and HTML links) across your file, folder, or entire vault. It even intelligently updates display aliases that match the old heading name.
 - 🔎 **Find References**: Need to know everywhere a heading is mentioned? Click "Find heading references..." to open a beautifully formatted search modal. See the exact context of each mention and jump straight to the source.
 - ⚡ **Lightning Fast Refactor**: Press `Shift + Enter` right inside the "Find References" modal to instantly rename the heading and all its references across your vault!
@@ -49,6 +49,7 @@ By default, the plugin registers commands without default keyboard shortcuts so 
    - `Copy Markdown Link`
    - `Rename this Heading`
    - `Find Heading References`
+   - `Convert Heading Link Target Format`
 
 > [!NOTE]
 > To prevent accidental triggers, these keyboard shortcuts are context-sensitive. They will **only trigger when your cursor is positioned directly on a heading line**. If you press the shortcut while the cursor is anywhere else in the document, the command will silently do nothing.
@@ -56,6 +57,7 @@ By default, the plugin registers commands without default keyboard shortcuts so 
 ### Settings Tab
 Navigate to **Settings > Heading Linker & Refactor** to customize the default behavior:
 - **File Path Format**: Choose whether generated links use relative paths (`./filename.md`) or full vault paths (`folder/filename.md`).
+- **Duplicate Heading Target Format**: Choose whether duplicate headings use Obsidian block IDs (`^id`) or legacy HTML anchors (`<a id="...">`).
 - **Rename Scope**: Set the default search scope when renaming a heading (search and replace in the **Entire vault**, **Current folder only**, or **Current file only**).
 
 ## 📥 Installation

@@ -1,4 +1,4 @@
-# Heading Linker & Refactor
+# Heading Linker and Refactor
 
 ![Obsidian Download](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=Downloads&query=%24%5B%22obsidian-heading-linker%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json) ![Total Downloads](https://img.shields.io/github/downloads/wilmtang/obsidian-heading-linker/total?style=flat&label=Total%20Downloads) ![GitHub Issues](https://img.shields.io/github/issues/wilmtang/obsidian-heading-linker?style=flat&label=Issues) ![GitHub Last Commit](https://img.shields.io/github/last-commit/wilmtang/obsidian-heading-linker?style=flat&label=Last%20Commit)
 
@@ -8,7 +8,7 @@
 
 As your vault grows, headings become powerful anchors for your thoughts. But Obsidian's native heading links can break if you rename them, and finding where a heading is used can be tedious. 
 
-**Heading Linker & Refactor** solves this by providing a suite of advanced tools right in your editor's context menu.
+**Heading Linker and Refactor** solves this by providing a suite of advanced tools right in your editor's context menu.
 
 ## ✨ Features
 
@@ -44,7 +44,7 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
 ### Keyboard Shortcuts (Hotkeys)
 By default, the plugin registers commands without default keyboard shortcuts so they don't conflict with your existing setup. You can assign your own custom shortcuts in Obsidian:
 1. Open Obsidian **Settings** and navigate to **Hotkeys**.
-2. Search for `Heading Linker & Refactor`.
+2. Search for `Heading Linker and Refactor`.
 3. Click the blank button next to a command to record a key combination for:
    - `Copy Markdown Link`
    - `Rename this Heading`
@@ -55,7 +55,7 @@ By default, the plugin registers commands without default keyboard shortcuts so 
 > To prevent accidental triggers, these keyboard shortcuts are context-sensitive. They will **only trigger when your cursor is positioned directly on a heading line**. If you press the shortcut while the cursor is anywhere else in the document, the command will silently do nothing.
 
 ### Settings Tab
-Navigate to **Settings > Heading Linker & Refactor** to customize the default behavior:
+Navigate to **Settings > Heading Linker and Refactor** to customize the default behavior:
 - **File Path Format**: Choose whether generated links use relative paths (`./filename.md`) or full vault paths (`folder/filename.md`).
 - **Duplicate Heading Target Format**: Choose whether duplicate headings use Obsidian block IDs (`^id`) or HTML anchors (`<a id="...">`).
 - **Rename Scope**: Set the default search scope when renaming a heading (search and replace in the **Entire vault**, **Current folder only**, or **Current file only**).
@@ -67,13 +67,13 @@ Navigate to **Settings > Heading Linker & Refactor** to customize the default be
 
 ### From Obsidian Community Plugins
 You can install this plugin directly from the Obsidian Community Plugins store:
-[Heading Linker & Refactor](https://community.obsidian.md/plugins/heading-link-copy)
+[Heading Linker and Refactor](https://community.obsidian.md/plugins/heading-link-copy)
 
 ### Manual Installation
 1. Download the latest release (`main.js` and `manifest.json`) from the [Releases](https://github.com/wilmtang/obsidian-heading-linker/releases) page.
 2. Create a folder named `obsidian-heading-linker` in your vault's `.obsidian/plugins/` directory.
 3. Place the downloaded files in that folder.
-4. Restart Obsidian, go to **Settings > Community Plugins**, disable "Safe Mode", and enable **Heading Linker & Refactor**.
+4. Restart Obsidian, go to **Settings > Community Plugins**, disable "Safe Mode", and enable **Heading Linker and Refactor**.
 
 ## 💻 Development
 

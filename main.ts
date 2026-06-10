@@ -943,13 +943,18 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 	}
 
 	open() {
-		this.findReferences().then(() => {
-			if (this.suggestions.length > 0) {
-				const scope = this.plugin.settings.renameScope;
-				this.setPlaceholder(`Found ${this.suggestions.length} reference(s) in ${scope} scope. Type to filter...`);
-				super.open();
-			}
-		});
+		void this.findReferences()
+			.then(() => {
+				if (this.suggestions.length > 0) {
+					const scope = this.plugin.settings.renameScope;
+					this.setPlaceholder(`Found ${this.suggestions.length} reference(s) in ${scope} scope. Type to filter...`);
+					super.open();
+				}
+			})
+			.catch((err) => {
+				console.error('Heading references: failed to search references', err);
+				new Notice('Failed to find heading references.');
+			});
 	}
 
 	async findReferences() {
@@ -1282,7 +1287,7 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Heading Link Copier')
+			.setName('Heading tools')
 			.setHeading();
 
 		new Setting(containerEl)

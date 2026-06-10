@@ -128,7 +128,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 				const targetHeading = this.getTargetHeading(view, editor);
 				if (targetHeading) {
 					if (!checking && view.file) {
-						this.copyHeadingLink(view.file, targetHeading, this.app.metadataCache.getFileCache(view.file)!, editor);
+						void this.copyHeadingLink(view.file, targetHeading, this.app.metadataCache.getFileCache(view.file)!, editor);
 					}
 					return true;
 				}
@@ -806,9 +806,9 @@ class RenameHeadingModal extends Modal {
 				text.setValue(this.newName);
 				text.onChange((value) => { this.newName = value; });
 				text.inputEl.select();
-				text.inputEl.style.width = '100%';
+				text.inputEl.setCssStyles({ width: '100%' });
 				text.inputEl.addEventListener('keydown', (e) => {
-					if (e.key === 'Enter') { e.preventDefault(); this.doRename(); }
+					if (e.key === 'Enter') { e.preventDefault(); void this.doRename(); }
 				});
 			});
 
@@ -942,13 +942,14 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 		});
 	}
 
-	async open() {
-		await this.findReferences();
-		if (this.suggestions.length > 0) {
-			const scope = this.plugin.settings.renameScope;
-			this.setPlaceholder(`Found ${this.suggestions.length} reference(s) in ${scope} scope. Type to filter...`);
-			super.open();
-		}
+	open() {
+		this.findReferences().then(() => {
+			if (this.suggestions.length > 0) {
+				const scope = this.plugin.settings.renameScope;
+				this.setPlaceholder(`Found ${this.suggestions.length} reference(s) in ${scope} scope. Type to filter...`);
+				super.open();
+			}
+		});
 	}
 
 	async findReferences() {
@@ -1034,11 +1035,11 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 		const afterMatch = ref.lineText.substring(ref.matchEndIndex);
 
 		if (beforeMatch.length > 0) {
-			lineEl.appendChild(document.createTextNode(beforeMatch));
+			lineEl.appendChild(activeDocument.createTextNode(beforeMatch));
 		}
 		lineEl.createEl('mark', { text: theMatch, attr: { style: 'color: var(--text-normal); background-color: var(--text-selection); border-radius: 2px;' } });
 		if (afterMatch.length > 0) {
-			lineEl.appendChild(document.createTextNode(afterMatch));
+			lineEl.appendChild(activeDocument.createTextNode(afterMatch));
 		}
 
 		for (const line of ref.linesAfter) {
@@ -1048,7 +1049,7 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 
 	onChooseSuggestion(ref: HeadingReference, evt: MouseEvent | KeyboardEvent) {
 		const leaf = this.app.workspace.getLeaf(false);
-		leaf.openFile(ref.file, { eState: { line: ref.lineNum } });
+		void leaf.openFile(ref.file, { eState: { line: ref.lineNum } });
 	}
 }
 
@@ -1281,7 +1282,7 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Heading Link Copier Settings')
+			.setName('Heading Link Copier')
 			.setHeading();
 
 		new Setting(containerEl)

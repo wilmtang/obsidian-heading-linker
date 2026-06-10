@@ -220,7 +220,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 
 		let fragment = "";
 		if (isUnique) {
-			fragment = encodeURIComponent(visibleHeading);
+			fragment = encodeMarkdownLinkFragment(visibleHeading);
 		} else {
 			const ensured = ensureHeadingTargetFormat(lineContent, visibleHeading, this.settings.duplicateHeadingTargetFormat);
 
@@ -258,6 +258,12 @@ function safeDecodeURIComponent(value: string): string {
 	} catch {
 		return value;
 	}
+}
+
+function encodeMarkdownLinkFragment(value: string): string {
+	return encodeURIComponent(value).replace(/[()]/g, char =>
+		`%${char.charCodeAt(0).toString(16).toUpperCase()}`
+	);
 }
 
 function getSafeIdBase(value: string): string {
@@ -371,6 +377,7 @@ function getEncodedHeadingVariants(heading: string): string[] {
 	return uniqueValues([
 		heading,
 		encodeURIComponent(heading),
+		encodeMarkdownLinkFragment(heading),
 		heading.replace(/ /g, '%20')
 	]);
 }
@@ -378,7 +385,7 @@ function getEncodedHeadingVariants(heading: string): string[] {
 function replaceHeadingTextReferences(data: string, oldName: string, newName: string): { data: string; count: number } {
 	let newData = data;
 	let count = 0;
-	const escapedNewEncoded = encodeURIComponent(newName);
+	const escapedNewEncoded = encodeMarkdownLinkFragment(newName);
 
 	const wikiLinkRegex = new RegExp(
 		`(\\[\\[[^\\]]*?#)${escapeRegex(oldName)}((?:\\]\\])|(?:\\|([^\\]]*)\\]\\]))`,

@@ -1,13 +1,12 @@
-name: Release Obsidian plugin
+name: Check and release Obsidian plugin
 
 on:
   push:
-    # Sequence of patterns matched against refs/tags
-    tags:
-      - "*" # Push events to matching any tag format, i.e. 1.0, 20.15.10
+    branches:
+      - "**"
 
 jobs:
-  build:
+  check-and-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,19 +15,104 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: "20.x"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build plugin
-        run: npm run build
+      - name: Run Obsidian release checks
+        run: npm run check:release
+
+      - name: Decide whether to create a release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(node -p "require('./manifest.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$version" >> "$GITHUB_OUTPUT"
+          echo "release_name=$version" >> "$GITHUB_OUTPUT"
+
+          default_branch="${{ github.event.repository.default_branch }}"
+          if [[ "$GITHUB_REF_NAME" != "$default_branch" ]]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Release skipped: $GITHUB_REF_NAME is not the default branch ($default_branch)."
+            exit 0
+          fi
+
+          before="${{ github.event.before }}"
+          if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Release skipped: previous commit is unavailable, so the manifest version bump cannot be verified."
+            exit 0
+          fi
+
+          if ! previous_version="$(git show "$before:manifest.json" 2>/dev/null | node -pe "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")"; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Release skipped: could not detect the previous manifest version."
+            exit 0
+          fi
+
+          if [[ "$previous_version" != "$version" ]]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Release triggered by manifest version bump: $previous_version -> $version."
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Release skipped: manifest version unchanged ($version)."
+          fi
+
+      - name: Create version tag
+        id: version-tag
+        if: steps.release.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_name="${{ steps.release.outputs.tag_name }}"
+          git fetch --tags --force
+
+          if git rev-parse -q --verify "refs/tags/$tag_name" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$tag_name")"
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "Tag $tag_name already exists at $tag_sha, not current commit $GITHUB_SHA." >&2
+              exit 1
+            fi
+
+            echo "Tag $tag_name already exists on the current commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag_name" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag_name"
+          echo "Created and pushed tag $tag_name."
+
+      - name: Check for existing release
+        id: existing-release
+        if: steps.release.outputs.should_release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "${{ steps.release.outputs.tag_name }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.release.outputs.tag_name }} already exists; skipping create step."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate artifact attestation
+        if: steps.release.outputs.should_release == 'true' && steps.existing-release.outputs.exists != 'true'
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
@@ -36,11 +120,15 @@ jobs:
             manifest.json
 
       - name: Create Release
+        if: steps.release.outputs.should_release == 'true' && steps.existing-release.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag_name }}
+          name: ${{ steps.release.outputs.release_name }}
+          target_commitish: ${{ github.sha }}
           files: |
             main.js
             manifest.json
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

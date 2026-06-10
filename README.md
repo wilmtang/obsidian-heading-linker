@@ -84,5 +84,25 @@ npm install
 npm run build
 ```
 
+### Useful scripts
+
+- `npm run dev`: Rebuilds `main.js` whenever `main.ts` changes.
+- `npm run build`: Bundles the plugin entrypoint into `main.js`.
+- `npm run typecheck`: Runs TypeScript validation without emitting files.
+- `npm run lint:obsidian`: Runs the local Obsidian release linter checks.
+- `npm run check:release`: Runs typecheck, Obsidian linting, and build; use this before creating a GitHub release or uploading a new version to the Obsidian store.
+
+### Release automation
+
+GitHub Actions runs `npm run check:release` on every branch push. This catches TypeScript, Obsidian linter, and build problems before anything is published.
+
+The release process uses `manifest.json` as the source of truth. When the `version` field changes on the default branch, the workflow:
+
+1. Runs the Obsidian release checks.
+2. Creates and pushes a matching git tag if one does not already exist.
+3. Creates a GitHub release named after the manifest version with `main.js` and `manifest.json`.
+
+If the workflow cannot compare the current manifest version with the previous commit, it skips release creation instead of guessing. Bump `manifest.json` again on the default branch to start a release.
+
 ---
 *Built with ❤️ for the Obsidian Community.*

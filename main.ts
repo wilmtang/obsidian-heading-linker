@@ -259,8 +259,12 @@ function safeDecodeURIComponent(value: string): string {
 	}
 }
 
+function escapeMarkdownLinkDestinationContent(value: string): string {
+	return value.replace(/>/g, '\\>');
+}
+
 function formatMarkdownLinkDestination(destination: string): string {
-	return `<${destination.replace(/>/g, '\\>')}>`;
+	return `<${escapeMarkdownLinkDestinationContent(destination)}>`;
 }
 
 function encodeMarkdownLinkFragment(value: string): string {
@@ -388,7 +392,8 @@ function getEncodedHeadingVariants(heading: string): string[] {
 function replaceHeadingTextReferences(data: string, oldName: string, newName: string): { data: string; count: number } {
 	let newData = data;
 	let count = 0;
-	const escapedNewEncoded = encodeMarkdownLinkFragment(newName);
+	const encodedNewHeading = encodeMarkdownLinkFragment(newName);
+	const wrappedNewHeading = escapeMarkdownLinkDestinationContent(newName);
 
 	const wikiLinkRegex = new RegExp(
 		`(\\[\\[[^\\]]*?#)${escapeRegex(oldName)}((?:\\]\\])|(?:\\|([^\\]]*)\\]\\]))`,
@@ -405,7 +410,7 @@ function replaceHeadingTextReferences(data: string, oldName: string, newName: st
 
 	for (const oldEncoded of getEncodedHeadingVariants(oldName)) {
 		const mdLinkRegex = new RegExp(
-			`\\[([^\\]]*)\\]\\(([^)]*?#)${escapeRegex(oldEncoded)}\\)`,
+			`\\[([^\\]\\n]*)\\]\\((<[^>\\n]*?#|[^)\\n]*?#)${escapeRegex(oldEncoded)}(>)?\\)`,
 			'g'
 		);
 		const htmlLinkRegex = new RegExp(
@@ -413,20 +418,21 @@ function replaceHeadingTextReferences(data: string, oldName: string, newName: st
 			'g'
 		);
 
-		newData = newData.replace(mdLinkRegex, (match, alias: string, pathAndHash: string) => {
+		newData = newData.replace(mdLinkRegex, (match, alias: string, pathAndHash: string, wrappedEnd: string | undefined) => {
 			count++;
+			const newHeading = wrappedEnd ? wrappedNewHeading : encodedNewHeading;
 			if (alias === oldName) {
-				return `[${newName}](${pathAndHash}${escapedNewEncoded})`;
+				return `[${newName}](${pathAndHash}${newHeading}${wrappedEnd ?? ''})`;
 			}
-			return `[${alias}](${pathAndHash}${escapedNewEncoded})`;
+			return `[${alias}](${pathAndHash}${newHeading}${wrappedEnd ?? ''})`;
 		});
 
 		newData = newData.replace(htmlLinkRegex, (match, beforeHref: string, afterHref: string, alias: string, endTag: string) => {
 			count++;
 			if (alias === oldName) {
-				return `${beforeHref}${escapedNewEncoded}${afterHref}${newName}${endTag}`;
+				return `${beforeHref}${encodedNewHeading}${afterHref}${newName}${endTag}`;
 			}
-			return `${beforeHref}${escapedNewEncoded}${afterHref}${alias}${endTag}`;
+			return `${beforeHref}${encodedNewHeading}${afterHref}${alias}${endTag}`;
 		});
 	}
 
@@ -485,7 +491,7 @@ function getReferenceMatches(line: string, headingName: string, targetIds: strin
 	matches.push(...findRegexMatches(line, wikiHeadingRegex));
 
 	for (const encodedHeading of getEncodedHeadingVariants(headingName)) {
-		const mdHeadingRegex = new RegExp(`\\[[^\\]]*\\]\\([^)]*?#${escapeRegex(encodedHeading)}\\)`, 'g');
+		const mdHeadingRegex = new RegExp(`\\[[^\\]\\n]*\\]\\((?:<[^>\\n]*?#${escapeRegex(encodedHeading)}>|[^)\\n]*?#${escapeRegex(encodedHeading)})\\)`, 'g');
 		const htmlHeadingRegex = new RegExp(`<a[^>]*?href=["'][^"']*?#${escapeRegex(encodedHeading)}["'][^>]*>[^<]*</a>`, 'g');
 		matches.push(...findRegexMatches(line, mdHeadingRegex));
 		matches.push(...findRegexMatches(line, htmlHeadingRegex));

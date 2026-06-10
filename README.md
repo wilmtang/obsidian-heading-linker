@@ -39,6 +39,70 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
    <br>
    <img src="images/search-references.png" alt="Find References Modal" width="600">
 
+## Link Generation and Reference Matching
+
+### Generated markdown links
+
+When you copy a link to a unique heading, the plugin uses the visible heading text as the Obsidian heading fragment and wraps the markdown destination in angle brackets. This is standard markdown syntax for link destinations that contain spaces or parentheses, and it lets Obsidian resolve the raw heading text directly.
+
+For example, this heading:
+
+```md
+## $O(n \cdot 2^n)$ solution
+```
+
+copies as:
+
+```md
+[$O(n \cdot 2^n)$ solution](<./Algorithms.md#$O(n \cdot 2^n)$ solution>)
+```
+
+The path portion follows the **File Path Format** setting:
+
+- Relative path mode uses `./FileName.md`.
+- Full path mode uses the full vault path, such as `folder/FileName.md`.
+
+If multiple headings in the same file have the same visible text, the plugin inserts or reuses a stable target marker instead of linking to the ambiguous heading text. By default it uses an Obsidian block ID:
+
+```md
+## Duplicate heading ^duplicate-heading-a1b2c3
+[Duplicate heading](<./Note.md#^duplicate-heading-a1b2c3>)
+```
+
+If the duplicate target format is set to HTML anchors, it uses an anchor ID instead:
+
+```md
+## Duplicate heading <a id="duplicate-heading-a1b2c3"></a>
+[Duplicate heading](<./Note.md#duplicate-heading-a1b2c3>)
+```
+
+### Finding heading references
+
+When you choose **Find heading references...**, the plugin scans markdown files in the selected scope and matches the heading by visible text and by any stable target IDs on the heading line.
+
+For heading-text links, it recognizes Obsidian wikilinks:
+
+```md
+[[Algorithms#$O(n \cdot 2^n)$ solution]]
+[[Algorithms#$O(n \cdot 2^n)$ solution|custom label]]
+```
+
+It also recognizes markdown links with raw wrapped destinations, percent-encoded destinations, and space-only encoded destinations:
+
+```md
+[$O(n \cdot 2^n)$ solution](<Algorithms.md#$O(n \cdot 2^n)$ solution>)
+[$O(n \cdot 2^n)$ solution](Algorithms.md#%24O%28n%20%5Ccdot%202%5En%29%24%20solution)
+[$O(n \cdot 2^n)$ solution](Algorithms.md#$O(n%20\cdot%202^n)$%20solution)
+```
+
+For stable duplicate-heading targets, it recognizes wiki, markdown, and HTML links that point to either `#id` or `#^id`, depending on the target format:
+
+```md
+[[Note#^duplicate-heading-a1b2c3]]
+[Duplicate heading](<Note.md#^duplicate-heading-a1b2c3>)
+<a href="Note.md#duplicate-heading-a1b2c3">Duplicate heading</a>
+```
+
 ## ⚙️ Configuration & Hotkeys
 
 ### Keyboard Shortcuts (Hotkeys)

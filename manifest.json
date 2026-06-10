@@ -1,6 +1,6 @@
 {
 	"id": "heading-link-copy",
-	"name": "Heading Linker & Refactor",
+	"name": "Heading Linker and Refactor",
 	"version": "1.0.7",
 	"minAppVersion": "0.15.0",
 	"description": "A comprehensive heading utility: Copy markdown links to headings, safely rename headings (refactor), and search for heading references.",

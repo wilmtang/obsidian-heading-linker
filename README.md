@@ -12,7 +12,7 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
 
 ## ✨ Features
 
-- 🔗 **Smart Linking**: Right-click any heading to copy a markdown link to it. If you have duplicate headings in the same file, the plugin automatically generates and inserts a stable target. Obsidian block IDs (e.g., `^heading-id`) are the default, with legacy HTML anchors (e.g., `<a id="...">`) available as a compatibility option.
+- 🔗 **Smart Linking**: Right-click any heading to copy a markdown link to it. If you have duplicate headings in the same file, the plugin automatically generates and inserts a stable target. Obsidian block IDs (e.g., `^heading-id`) are the default, with HTML anchors (e.g., `<a id="...">`) available as a web/export compatibility option.
 - 📝 **Safe Renaming**: Right-click a heading and select "Rename this heading...". The plugin will safely rename the heading and instantly update every single link pointing to it (Wiki, Markdown, and HTML links) across your file, folder, or entire vault. It even intelligently updates display aliases that match the old heading name.
 - 🔎 **Find References**: Need to know everywhere a heading is mentioned? Click "Find heading references..." to open a beautifully formatted search modal. See the exact context of each mention and jump straight to the source.
 - ⚡ **Lightning Fast Refactor**: Press `Shift + Enter` right inside the "Find References" modal to instantly rename the heading and all its references across your vault!
@@ -57,8 +57,11 @@ By default, the plugin registers commands without default keyboard shortcuts so 
 ### Settings Tab
 Navigate to **Settings > Heading Linker & Refactor** to customize the default behavior:
 - **File Path Format**: Choose whether generated links use relative paths (`./filename.md`) or full vault paths (`folder/filename.md`).
-- **Duplicate Heading Target Format**: Choose whether duplicate headings use Obsidian block IDs (`^id`) or legacy HTML anchors (`<a id="...">`).
+- **Duplicate Heading Target Format**: Choose whether duplicate headings use Obsidian block IDs (`^id`) or HTML anchors (`<a id="...">`).
 - **Rename Scope**: Set the default search scope when renaming a heading (search and replace in the **Entire vault**, **Current folder only**, or **Current file only**).
+
+> [!NOTE]
+> Obsidian block IDs are the default because Obsidian's internal note links jump to headings or block references, not arbitrary HTML `id` attributes. A link like `Note.md#my-html-id` may work after the note is rendered on the web, but it will not reliably jump to `<a id="my-html-id"></a>` inside Obsidian. Use HTML anchors only when exported or web-rendered Markdown compatibility matters more than Obsidian-native navigation.
 
 ## 📥 Installation
 

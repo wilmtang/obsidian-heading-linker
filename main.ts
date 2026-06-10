@@ -1075,8 +1075,8 @@ class ConvertHeadingTargetFormatModal extends Modal {
 			.setName('Direction')
 			.setDesc('Dry run a vault-wide conversion before applying changes.')
 			.addDropdown(drop => drop
-				.addOption('html-to-block', 'Legacy HTML anchors -> Obsidian block IDs')
-				.addOption('block-to-html', 'Obsidian block IDs -> Legacy HTML anchors')
+				.addOption('html-to-block', 'HTML anchors -> Obsidian block IDs')
+				.addOption('block-to-html', 'Obsidian block IDs -> HTML anchors')
 				.setValue(this.direction)
 				.onChange(async (value: string) => {
 					this.direction = value as ConversionDirection;
@@ -1145,8 +1145,8 @@ class ConvertHeadingTargetFormatModal extends Modal {
 		const changedFiles = new Set(this.plan.changes.filter(change => change.afterLine !== undefined).map(change => change.file.path)).size;
 		const skipped = this.plan.changes.filter(change => change.afterLine === undefined).length;
 		const directionText = this.direction === 'html-to-block'
-			? 'Legacy HTML anchors -> Obsidian block IDs'
-			: 'Obsidian block IDs -> Legacy HTML anchors';
+			? 'HTML anchors -> Obsidian block IDs'
+			: 'Obsidian block IDs -> HTML anchors';
 
 		this.summaryEl.setText(`${directionText}: ${this.plan.headingChanges} heading line(s), ${this.plan.linkChanges} link line(s), ${changedFiles} file(s), ${skipped} skipped item(s).`);
 	}
@@ -1301,7 +1301,7 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 			.setDesc('Choose how duplicate headings get stable targets.')
 			.addDropdown(drop => drop
 				.addOption('obsidian-block', 'Obsidian block ID (^id)')
-				.addOption('html-anchor', 'Legacy HTML anchor (<a id="..."></a>)')
+				.addOption('html-anchor', 'HTML anchor (<a id="..."></a>)')
 				.setValue(this.plugin.settings.duplicateHeadingTargetFormat)
 				.onChange(async (value: string) => {
 					this.plugin.settings.duplicateHeadingTargetFormat = value as DuplicateHeadingTargetFormat;

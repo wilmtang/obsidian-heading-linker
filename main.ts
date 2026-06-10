@@ -206,8 +206,6 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 			pathStr = `./${file.name}`; // e.g., "./file.md"
 		}
 
-		const encodedPath = pathStr.split('/').map(p => encodeURIComponent(p)).join('/');
-
 		const lineNum = targetHeading.position.start.line;
 		const lineContent = editor.getLine(lineNum);
 		const visibleHeading = getHeadingVisibleText(lineContent, targetHeading.heading);
@@ -220,7 +218,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 
 		let fragment = "";
 		if (isUnique) {
-			fragment = encodeMarkdownLinkFragment(visibleHeading);
+			fragment = visibleHeading;
 		} else {
 			const ensured = ensureHeadingTargetFormat(lineContent, visibleHeading, this.settings.duplicateHeadingTargetFormat);
 
@@ -233,7 +231,8 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 
 		// 3. Assemble Final Markdown Link
 		const linkText = visibleHeading;
-		const markdownLink = `[${linkText}](${encodedPath}#${fragment})`;
+		const destination = formatMarkdownLinkDestination(`${pathStr}#${fragment}`);
+		const markdownLink = `[${linkText}](${destination})`;
 
 		// 4. Write to Clipboard
 		await navigator.clipboard.writeText(markdownLink);
@@ -258,6 +257,10 @@ function safeDecodeURIComponent(value: string): string {
 	} catch {
 		return value;
 	}
+}
+
+function formatMarkdownLinkDestination(destination: string): string {
+	return `<${destination.replace(/>/g, '\\>')}>`;
 }
 
 function encodeMarkdownLinkFragment(value: string): string {

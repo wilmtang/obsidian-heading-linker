@@ -963,6 +963,46 @@ function addMigrationId(ids: Set<string>, id: string): void {
 	ids.add(id);
 }
 
+function uniqueTargetMarkers(targets: HeadingTargetMarker[]): HeadingTargetMarker[] {
+	const seen = new Set<string>();
+	return targets.filter(target => {
+		const key = `${target.format}:${target.id}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
+function convertHeadingTargets(
+	parsedHeading: ParsedHeadingLine,
+	sourceFormat: TargetMarkerFormat,
+	targetFormat: TargetMarkerFormat,
+	idMap: Map<string, string> | undefined
+): { line: string; ids: string[] } | null {
+	if (!idMap) return null;
+
+	const convertedIds: string[] = [];
+	const convertedTargets = parsedHeading.targets.map(target => {
+		if (target.format !== sourceFormat) return target;
+
+		const targetId = idMap.get(target.id);
+		if (!targetId) return target;
+
+		convertedIds.push(target.id);
+		return {
+			format: targetFormat,
+			id: targetId
+		};
+	});
+
+	if (convertedIds.length === 0) return null;
+
+	return {
+		line: buildHeadingLineWithTargets(parsedHeading.prefix, parsedHeading.visibleText, uniqueTargetMarkers(convertedTargets)),
+		ids: convertedIds
+	};
+}
+
 function buildLineMigrationChange(
 	app: App,
 	file: TFile,
@@ -979,13 +1019,14 @@ function buildLineMigrationChange(
 	let reason: string | undefined;
 
 	const parsedHeading = parseHeadingLine(newLine);
-	const sourceTarget = parsedHeading?.targets.find(target => target.format === sourceFormat);
-	if (parsedHeading && sourceTarget) {
-		const targetId = idMapByFile.get(file.path)?.get(sourceTarget.id);
-		if (targetId) {
-			newLine = buildHeadingLine(parsedHeading.prefix, parsedHeading.visibleText, targetFormat, targetId);
-			addMigrationKind(kinds, 'heading');
-			addMigrationId(ids, sourceTarget.id);
+	const headingConversion = parsedHeading
+		? convertHeadingTargets(parsedHeading, sourceFormat, targetFormat, idMapByFile.get(file.path))
+		: null;
+	if (headingConversion) {
+		newLine = headingConversion.line;
+		addMigrationKind(kinds, 'heading');
+		for (const id of headingConversion.ids) {
+			addMigrationId(ids, id);
 		}
 	}
 
@@ -1060,7 +1101,7 @@ function buildLineMigrationChange(
 	};
 }
 
-async function buildMigrationPlan(app: App, direction: ConversionDirection): Promise<MigrationPlan> {
+export async function buildMigrationPlan(app: App, direction: ConversionDirection): Promise<MigrationPlan> {
 	const files = app.vault.getMarkdownFiles();
 	const linesByFile = new Map<string, string[]>();
 	const idMapByFile = new Map<string, Map<string, string>>();

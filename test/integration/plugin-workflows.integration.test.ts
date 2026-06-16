@@ -39,6 +39,7 @@ vi.mock('obsidian', () => {
 });
 
 import HeadingLinkCopierPlugin, {
+	buildMigrationPlan,
 	renameHeadingReferences
 } from '../../main.ts';
 
@@ -221,5 +222,46 @@ describe('plugin workflow e2e', () => {
 			'<a href="Target.md#Overview">Overview</a>'
 		].join('\n'));
 		expect(contentByPath.get('Other.md')).toBe('# Intro');
+	});
+
+	it.each([
+		{
+			direction: 'block-to-html' as const,
+			beforeHeading: '## Intro <a id="intro-web"></a> ^intro-block',
+			afterHeading: '## Intro <a id="intro-web"></a> <a id="intro-block"></a>',
+			beforeLink: '[Intro](<Target.md#^intro-block>)',
+			afterLink: '[Intro](<Target.md#intro-block>)',
+			convertedId: 'intro-block'
+		},
+		{
+			direction: 'html-to-block' as const,
+			beforeHeading: '## Intro <a id="intro-web"></a> ^intro-block',
+			afterHeading: '## Intro ^intro-web ^intro-block',
+			beforeLink: '[Intro](<Target.md#intro-web>)',
+			afterLink: '[Intro](<Target.md#^intro-web>)',
+			convertedId: 'intro-web'
+		}
+	])('preserves unrelated target markers during $direction migration', async ({
+		direction,
+		beforeHeading,
+		afterHeading,
+		beforeLink,
+		afterLink,
+		convertedId
+	}) => {
+		const { app } = createVault({
+			'Target.md': `${beforeHeading}\n${beforeLink}`
+		});
+
+		const plan = await buildMigrationPlan(app as any, direction);
+		const headingChange = plan.changes.find(change => change.lineNum === 0);
+		const linkChange = plan.changes.find(change => change.lineNum === 1);
+
+		expect(plan.headingChanges).toBe(1);
+		expect(plan.linkChanges).toBe(1);
+		expect(headingChange?.afterLine).toBe(afterHeading);
+		expect(headingChange?.ids).toEqual([convertedId]);
+		expect(linkChange?.afterLine).toBe(afterLink);
+		expect(linkChange?.ids).toEqual([convertedId]);
 	});
 });

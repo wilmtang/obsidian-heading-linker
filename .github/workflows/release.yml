@@ -26,8 +26,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Obsidian e2e downloads
+        uses: actions/cache@v4
+        with:
+          path: .obsidian-cache
+          key: obsidian-e2e-${{ runner.os }}-${{ hashFiles('package-lock.json', 'wdio.conf.mts') }}
+          restore-keys: |
+            obsidian-e2e-${{ runner.os }}-
+
       - name: Run Obsidian release checks
         run: npm run check:release
+
+      - name: Typecheck WebdriverIO e2e tests
+        run: npm run typecheck:e2e
+
+      - name: Run WebdriverIO e2e tests
+        run: xvfb-run -a npm run test:e2e
 
       - name: Decide whether to create a release
         id: release

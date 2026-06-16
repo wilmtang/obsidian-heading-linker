@@ -163,7 +163,7 @@ npm run build
 
 ### Release automation
 
-GitHub Actions runs `npm run check:release` on every branch push. This catches version drift, TypeScript, Obsidian linter, unit test, and build problems before anything is published.
+GitHub Actions runs `npm run check:release`, `npm run typecheck:e2e`, and `xvfb-run -a npm run test:e2e` on every branch push. This catches version drift, TypeScript, Obsidian linter, unit test, build, and real Obsidian/WebdriverIO problems before anything is published.
 
 The release process uses `manifest.json` as the source of truth. When the `version` field changes on the default branch, the workflow:
 

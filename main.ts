@@ -1598,11 +1598,11 @@ class HeadingLinkSettingTab extends PluginSettingTab {
 			.setHeading();
 
 		new Setting(containerEl)
-			.setName('File Path Format')
-			.setDesc('Choose whether to include the relative path or the full vault path.')
+			.setName('Link Path Format')
+			.setDesc('Choose whether generated links use the target file basename or full vault path.')
 			.addDropdown(drop => drop
-				.addOption('relative', 'Relative (./filename.md)')
-				.addOption('full', 'Full (folder/filename.md)')
+				.addOption('relative', 'Basename (./filename.md)')
+				.addOption('full', 'Full vault path (folder/filename.md)')
 				.setValue(this.plugin.settings.pathFormat)
 				.onChange(async (value: string) => {
 					this.plugin.settings.pathFormat = value as 'relative' | 'full';

@@ -57,10 +57,10 @@ copies as:
 [$O(n \cdot 2^n)$ solution](<./Algorithms.md#$O(n \cdot 2^n)$ solution>)
 ```
 
-The path portion follows the **File Path Format** setting:
+The path portion follows the **Link Path Format** setting:
 
-- Relative path mode uses `./FileName.md`.
-- Full path mode uses the full vault path, such as `folder/FileName.md`.
+- Basename mode uses `./FileName.md`.
+- Full vault path mode uses the full vault path, such as `folder/FileName.md`.
 
 If multiple headings in the same file have the same visible text, the plugin inserts or reuses a stable target marker instead of linking to the ambiguous heading text. By default it uses an Obsidian block ID:
 
@@ -120,7 +120,7 @@ By default, the plugin registers commands without default keyboard shortcuts so 
 
 ### Settings Tab
 Navigate to **Settings > Heading Linker and Refactor** to customize the default behavior:
-- **File Path Format**: Choose whether generated links use relative paths (`./filename.md`) or full vault paths (`folder/filename.md`).
+- **Link Path Format**: Choose whether generated links use the target file basename (`./filename.md`) or full vault path (`folder/filename.md`).
 - **Duplicate Heading Target Format**: Choose whether duplicate headings use Obsidian block IDs (`^id`) or HTML anchors (`<a id="...">`).
 - **Rename Scope**: Set the default search scope when renaming a heading (search and replace in the **Entire vault**, **Current folder only**, or **Current file only**).
 

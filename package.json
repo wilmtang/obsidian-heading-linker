@@ -7,9 +7,12 @@
     "build": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs --target=node16",
     "dev": "npm run build -- --watch",
     "test": "vitest run",
+    "test:integration": "vitest run test/integration",
+    "test:e2e": "npm run build && wdio run ./wdio.conf.mts",
     "check:versions": "node scripts/check-versions.mjs",
     "lint:obsidian": "eslint main.ts",
     "typecheck": "tsc --noEmit",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
     "check:release": "npm run check:versions && npm run typecheck && npm run lint:obsidian && npm test && npm run build"
   },
   "keywords": [],
@@ -21,13 +24,26 @@
     "tslib": "^2.8.1"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^25.7.0",
     "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.61.0",
+    "@wdio/cli": "^9.28.0",
+    "@wdio/globals": "^9.28.0",
+    "@wdio/local-runner": "^9.28.0",
+    "@wdio/mocha-framework": "^9.28.0",
+    "@wdio/types": "^9.28.0",
     "esbuild": "^0.28.1",
     "eslint": "^9.39.4",
     "eslint-plugin-obsidianmd": "^0.3.0",
+    "mocha": "^11.7.6",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wdio-obsidian-reporter": "^3.1.1",
+    "wdio-obsidian-service": "^3.1.1"
+  },
+  "overrides": {
+    "diff": "^9.0.0",
+    "serialize-javascript": "^7.0.5"
   }
 }

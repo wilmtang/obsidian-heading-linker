@@ -108,6 +108,13 @@ interface ReferenceTarget {
 	targetIds: string[];
 }
 
+interface HeadingRenameResult {
+	totalLinks: number;
+	totalFiles: number;
+	affectedFiles: string[];
+	failedFiles: string[];
+}
+
 export default class HeadingLinkCopierPlugin extends Plugin {
 	settings!: HeadingLinkSettings;
 
@@ -767,6 +774,50 @@ export function rewriteReferencesInEditor(
 	return count;
 }
 
+export async function renameHeadingReferences(
+	app: App,
+	editor: Editor,
+	target: ReferenceTarget,
+	filesToSearch: TFile[]
+): Promise<HeadingRenameResult> {
+	let totalLinks = 0;
+	let totalFiles = 0;
+	const affectedFiles: string[] = [];
+	const failedFiles: string[] = [];
+
+	for (const f of filesToSearch) {
+		try {
+			let fileLinksUpdated = 0;
+
+			if (isSameFile(f, target.file)) {
+				fileLinksUpdated = rewriteReferencesInEditor(app, editor, f, target);
+			} else {
+				await app.vault.process(f, (data) => {
+					const result = rewriteReferencesInContent(app, f, data, target);
+					fileLinksUpdated += result.count;
+					return result.data;
+				});
+			}
+
+			if (fileLinksUpdated > 0) {
+				totalLinks += fileLinksUpdated;
+				totalFiles++;
+				affectedFiles.push(`${f.path} (${fileLinksUpdated} link${fileLinksUpdated > 1 ? 's' : ''})`);
+			}
+		} catch (err) {
+			console.error(`Heading rename: failed to process ${f.path}`, err);
+			failedFiles.push(f.path);
+		}
+	}
+
+	return {
+		totalLinks,
+		totalFiles,
+		affectedFiles,
+		failedFiles
+	};
+}
+
 function splitLines(content: string): string[] {
 	return content.split(/\r\n|[\n\v\f\r\x85\u2028\u2029]/);
 }
@@ -1122,11 +1173,6 @@ class RenameHeadingModal extends Modal {
 
 		const filesToSearch = getFilesInScope(this.app, this.file, this.plugin.settings.renameScope);
 
-		// Search and replace in each file
-		let totalLinks = 0;
-		let totalFiles = 0;
-		const affectedFiles: string[] = [];
-		const failedFiles: string[] = [];
 		const target: ReferenceTarget = {
 			file: this.file,
 			oldName,
@@ -1135,33 +1181,12 @@ class RenameHeadingModal extends Modal {
 		};
 
 		this.editor.setLine(lineNum, newLine);
-
-		for (const f of filesToSearch) {
-			try {
-				let fileLinksUpdated = 0;
-
-				const updateData = (data: string): string => {
-					const result = rewriteReferencesInContent(this.app, f, data, target);
-					fileLinksUpdated += result.count;
-					return result.data;
-				};
-
-				if (isSameFile(f, this.file)) {
-					fileLinksUpdated = rewriteReferencesInEditor(this.app, this.editor, f, target);
-				} else {
-					await this.app.vault.process(f, updateData);
-				}
-
-				if (fileLinksUpdated > 0) {
-					totalLinks += fileLinksUpdated;
-					totalFiles++;
-					affectedFiles.push(`${f.path} (${fileLinksUpdated} link${fileLinksUpdated > 1 ? 's' : ''})`);
-				}
-			} catch (err) {
-				console.error(`Heading rename: failed to process ${f.path}`, err);
-				failedFiles.push(f.path);
-			}
-		}
+		const {
+			totalLinks,
+			totalFiles,
+			affectedFiles,
+			failedFiles
+		} = await renameHeadingReferences(this.app, this.editor, target, filesToSearch);
 
 		if (failedFiles.length > 0) {
 			const summary = `Heading renamed with ${failedFiles.length} file${failedFiles.length > 1 ? 's' : ''} skipped. Updated ${totalLinks} link${totalLinks === 1 ? '' : 's'} across ${totalFiles} file${totalFiles === 1 ? '' : 's'}.\nFailed:\n${failedFiles.join('\n')}`;

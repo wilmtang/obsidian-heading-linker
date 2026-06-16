@@ -153,8 +153,11 @@ npm run build
 - `npm run dev`: Rebuilds `main.js` whenever `main.ts` changes.
 - `npm run build`: Bundles the plugin entrypoint into `main.js`.
 - `npm test`: Runs focused unit tests for link detection and rewrite behavior.
+- `npm run test:integration`: Runs workflow tests against fake Obsidian app, vault, file, and editor services.
+- `npm run test:e2e`: Launches a sandboxed desktop Obsidian instance through WebdriverIO and tests the packaged plugin in a real vault.
 - `npm run check:versions`: Verifies `manifest.json` and `package.json` use the same version.
 - `npm run typecheck`: Runs TypeScript validation without emitting files.
+- `npm run typecheck:e2e`: Runs TypeScript validation for the WebdriverIO Obsidian e2e config and specs.
 - `npm run lint:obsidian`: Runs the local Obsidian release linter checks.
 - `npm run check:release`: Runs version consistency, typecheck, Obsidian linting, unit tests, and build; use this before creating a GitHub release or uploading a new version to the Obsidian store.
 

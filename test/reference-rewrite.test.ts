@@ -158,6 +158,25 @@ describe('source-aware reference rewriting', () => {
 		expect(matches.map(match => match.kind)).toEqual(['wikilink', 'markdown-link']);
 	});
 
+	it('recognizes and rewrites markdown destinations with escaped greater-than signs', () => {
+		const { app, files } = createMockApp(['Target > File.md', 'Notes/Source.md']);
+		const sourceFile = files.get('Notes/Source.md')!;
+		const targetFile = files.get('Target > File.md')!;
+		const content = '[A > B](<./Target \\> File.md#A \\> B>)';
+
+		const matches = getReferenceMatches(app as any, content, sourceFile as any, targetFile as any, 'A > B', []);
+		const result = rewriteReferencesInContent(app as any, sourceFile as any, content, {
+			file: targetFile as any,
+			oldName: 'A > B',
+			newName: 'C > D',
+			targetIds: []
+		});
+
+		expect(matches.map(match => match.kind)).toEqual(['markdown-link']);
+		expect(result.count).toBe(1);
+		expect(result.data).toBe('[C > D](<./Target \\> File.md#C \\> D>)');
+	});
+
 	it('escapes markdown link text when copied or rewritten', () => {
 		expect(escapeMarkdownLinkText('A [bracket] \\ path')).toBe('A \\[bracket\\] \\\\ path');
 	});

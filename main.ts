@@ -302,6 +302,10 @@ function escapeMarkdownLinkDestinationContent(value: string): string {
 	return value.replace(/>/g, '\\>');
 }
 
+function unescapeMarkdownLinkDestinationContent(value: string): string {
+	return value.replace(/\\>/g, '>');
+}
+
 export function escapeMarkdownLinkText(value: string): string {
 	return value
 		.replace(/\\/g, '\\\\')
@@ -561,7 +565,7 @@ function rewriteMarkdownDestinationHeading(rawDestination: string, newName: stri
 
 	const path = stripped.destination.substring(0, hashIndex);
 	const newFragment = stripped.wrapped
-		? escapeMarkdownLinkDestinationContent(newName)
+		? newName
 		: encodeMarkdownLinkFragment(newName);
 
 	return restoreDestinationWrapper(`${path}#${newFragment}`, stripped.wrapped);
@@ -635,7 +639,7 @@ function collectReferenceLineChanges(
 		return match;
 	});
 
-	line.replace(/\[([^\]\n]*)\]\((<[^>\n]+>|[^)\s\n]+)\)/g, (match: string, label: string, destination: string, offset: number) => {
+	line.replace(/\[([^\]\n]*)\]\((<(?:\\[^\n]|[^>\\\n])+>|[^)\s\n]+)\)/g, (match: string, label: string, destination: string, offset: number) => {
 		const parts = getMarkdownDestinationParts(destination);
 		if (!parts) return match;
 
@@ -828,13 +832,13 @@ function isExternalDestination(destination: string): boolean {
 
 function stripDestinationWrapper(destination: string): { destination: string; wrapped: boolean } {
 	if (destination.startsWith('<') && destination.endsWith('>')) {
-		return { destination: destination.substring(1, destination.length - 1), wrapped: true };
+		return { destination: unescapeMarkdownLinkDestinationContent(destination.substring(1, destination.length - 1)), wrapped: true };
 	}
 	return { destination, wrapped: false };
 }
 
 function restoreDestinationWrapper(destination: string, wrapped: boolean): string {
-	return wrapped ? `<${destination}>` : destination;
+	return wrapped ? formatMarkdownLinkDestination(destination) : destination;
 }
 
 function getSourceIdFromSubpath(subpath: string, direction: ConversionDirection): string | null {
@@ -998,7 +1002,7 @@ function buildLineMigrationChange(
 		return `[[${rewrite.target}${alias}]]`;
 	});
 
-	newLine = newLine.replace(/(\[[^\]\n]*\]\()(<[^>\n]+>|[^)\s\n]+)(\))/g, (match, before: string, destination: string, after: string) => {
+	newLine = newLine.replace(/(\[[^\]\n]*\]\()(<(?:\\[^\n]|[^>\\\n])+>|[^)\s\n]+)(\))/g, (match, before: string, destination: string, after: string) => {
 		const rewrite = maybeRewriteMarkdownDestination(app, destination, file, idMapByFile, direction);
 
 		if (!rewrite) return match;

@@ -25,9 +25,9 @@ export default [
 			'obsidianmd/no-unsupported-api': 'error',
 			'obsidianmd/prefer-active-doc': 'warn',
 			'obsidianmd/settings-tab/no-problematic-settings-headings': 'error',
-			'@typescript-eslint/no-floating-promises': 'warn',
+			'@typescript-eslint/no-floating-promises': 'error',
 			'@typescript-eslint/no-misused-promises': [
-				'warn',
+				'error',
 				{
 					checksVoidReturn: {
 						arguments: true,

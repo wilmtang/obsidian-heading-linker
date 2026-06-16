@@ -152,13 +152,15 @@ npm run build
 
 - `npm run dev`: Rebuilds `main.js` whenever `main.ts` changes.
 - `npm run build`: Bundles the plugin entrypoint into `main.js`.
+- `npm test`: Runs focused unit tests for link detection and rewrite behavior.
+- `npm run check:versions`: Verifies `manifest.json` and `package.json` use the same version.
 - `npm run typecheck`: Runs TypeScript validation without emitting files.
 - `npm run lint:obsidian`: Runs the local Obsidian release linter checks.
-- `npm run check:release`: Runs typecheck, Obsidian linting, and build; use this before creating a GitHub release or uploading a new version to the Obsidian store.
+- `npm run check:release`: Runs version consistency, typecheck, Obsidian linting, unit tests, and build; use this before creating a GitHub release or uploading a new version to the Obsidian store.
 
 ### Release automation
 
-GitHub Actions runs `npm run check:release` on every branch push. This catches TypeScript, Obsidian linter, and build problems before anything is published.
+GitHub Actions runs `npm run check:release` on every branch push. This catches version drift, TypeScript, Obsidian linter, unit test, and build problems before anything is published.
 
 The release process uses `manifest.json` as the source of truth. When the `version` field changes on the default branch, the workflow:
 

@@ -1,7 +1,6 @@
 import {
 	App,
 	ButtonComponent,
-	CachedMetadata,
 	Editor,
 	HeadingCache,
 	MarkdownFileInfo,
@@ -44,6 +43,7 @@ interface ParsedHeadingLine {
 	prefix: string;
 	visibleText: string;
 	target?: HeadingTargetMarker;
+	targets: HeadingTargetMarker[];
 }
 
 interface LinkRewriteResult {
@@ -74,6 +74,40 @@ interface MigrationPlan {
 	linkChanges: number;
 }
 
+type ReferenceKind = 'wikilink' | 'markdown-link' | 'html-link';
+type ReferenceTargetKind = 'heading' | 'stable-id';
+
+interface ResolvedReferenceMatch {
+	start: number;
+	end: number;
+	kind: ReferenceKind;
+	targetKind: ReferenceTargetKind;
+}
+
+interface ReferenceRewrite {
+	start: number;
+	end: number;
+	replacement: string;
+}
+
+interface ReferenceLineRewriteResult {
+	line: string;
+	count: number;
+	matches: ResolvedReferenceMatch[];
+}
+
+interface TextLine {
+	text: string;
+	ending: string;
+}
+
+interface ReferenceTarget {
+	file: TFile;
+	oldName: string;
+	newName: string;
+	targetIds: string[];
+}
+
 export default class HeadingLinkCopierPlugin extends Plugin {
 	settings!: HeadingLinkSettings;
 
@@ -98,7 +132,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 					menu.addItem((item) => {
 						item.setTitle('Copy markdown link to heading')
 							.setIcon('link')
-							.onClick(() => this.copyHeadingLink(file, targetHeading, cache, editor));
+							.onClick(() => void this.copyHeadingLink(file, targetHeading, editor));
 					});
 
 					menu.addItem((item) => {
@@ -128,7 +162,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 				const targetHeading = this.getTargetHeading(view, editor);
 				if (targetHeading) {
 					if (!checking && view.file) {
-						void this.copyHeadingLink(view.file, targetHeading, this.app.metadataCache.getFileCache(view.file)!, editor);
+						void this.copyHeadingLink(view.file, targetHeading, editor);
 					}
 					return true;
 				}
@@ -197,7 +231,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	async copyHeadingLink(file: TFile, targetHeading: HeadingCache, cache: CachedMetadata, editor: Editor) {
+	async copyHeadingLink(file: TFile, targetHeading: HeadingCache, editor: Editor) {
 		// 1. Determine File Path String
 		let pathStr = "";
 		if (this.settings.pathFormat === 'full') {
@@ -211,9 +245,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 		const visibleHeading = getHeadingVisibleText(lineContent, targetHeading.heading);
 
 		// 2. Check for uniqueness and determine fragment
-		const matchingHeadingCount = cache.headings
-			? cache.headings.filter(h => getHeadingVisibleText(editor.getLine(h.position.start.line), h.heading) === visibleHeading).length
-			: 1;
+		const matchingHeadingCount = countMatchingHeadingVisibleText(editor, visibleHeading);
 		const isUnique = matchingHeadingCount === 1;
 
 		let fragment = "";
@@ -230,7 +262,7 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 		}
 
 		// 3. Assemble Final Markdown Link
-		const linkText = visibleHeading;
+		const linkText = escapeMarkdownLinkText(visibleHeading);
 		const destination = formatMarkdownLinkDestination(`${pathStr}#${fragment}`);
 		const markdownLink = `[${linkText}](${destination})`;
 
@@ -263,6 +295,13 @@ function escapeMarkdownLinkDestinationContent(value: string): string {
 	return value.replace(/>/g, '\\>');
 }
 
+export function escapeMarkdownLinkText(value: string): string {
+	return value
+		.replace(/\\/g, '\\\\')
+		.replace(/\[/g, '\\[')
+		.replace(/\]/g, '\\]');
+}
+
 function formatMarkdownLinkDestination(destination: string): string {
 	return `<${escapeMarkdownLinkDestinationContent(destination)}>`;
 }
@@ -290,31 +329,38 @@ function isSafeTargetId(id: string): boolean {
 	return /^[A-Za-z0-9-]+$/.test(id);
 }
 
-function parseHeadingLine(line: string): ParsedHeadingLine | null {
+export function parseHeadingLine(line: string): ParsedHeadingLine | null {
 	const headingMatch = line.match(/^(#{1,6}\s+)(.*)$/);
 	if (!headingMatch) return null;
 
 	let content = headingMatch[2].trimEnd();
-	let target: HeadingTargetMarker | undefined;
+	const reversedTargets: HeadingTargetMarker[] = [];
 
-	const blockMatch = content.match(/^(.*?)(?:\s+\^([A-Za-z0-9-]+))$/);
-	if (blockMatch) {
-		content = blockMatch[1].trimEnd();
-		target = { format: 'obsidian-block', id: blockMatch[2] };
-	}
-
-	const anchorMatch = content.match(/^(.*?)(?:\s*<a\s+[^>]*\bid=(["'])([A-Za-z0-9-]+)\2[^>]*>\s*<\/a>)$/i);
-	if (anchorMatch) {
-		content = anchorMatch[1].trimEnd();
-		if (!target) {
-			target = { format: 'html-anchor', id: anchorMatch[3] };
+	while (true) {
+		const blockMatch = content.match(/^(.*?)(?:\s+\^([A-Za-z0-9-]+))$/);
+		if (blockMatch) {
+			content = blockMatch[1].trimEnd();
+			reversedTargets.push({ format: 'obsidian-block', id: blockMatch[2] });
+			continue;
 		}
+
+		const anchorMatch = content.match(/^(.*?)(?:\s*<a\s+[^>]*\bid=(["'])([A-Za-z0-9-]+)\2[^>]*>\s*<\/a>)$/i);
+		if (anchorMatch) {
+			content = anchorMatch[1].trimEnd();
+			reversedTargets.push({ format: 'html-anchor', id: anchorMatch[3] });
+			continue;
+		}
+
+		break;
 	}
+
+	const targets = reversedTargets.reverse();
 
 	return {
 		prefix: headingMatch[1],
 		visibleText: content,
-		target
+		target: targets[targets.length - 1],
+		targets
 	};
 }
 
@@ -335,11 +381,17 @@ function buildHeadingLine(prefix: string, visibleText: string, format?: TargetMa
 	return `${prefix}${visibleText}${marker}`;
 }
 
+function buildHeadingLineWithTargets(prefix: string, visibleText: string, targets: HeadingTargetMarker[]): string {
+	const markers = targets.map(target => formatTargetMarker(target.format, target.id));
+	return `${prefix}${visibleText}${markers.length > 0 ? ` ${markers.join(' ')}` : ''}`;
+}
+
 function ensureHeadingTargetFormat(line: string, fallbackHeading: string, targetFormat: TargetMarkerFormat): { line: string; id: string } {
 	const parsed = parseHeadingLine(line);
 	const prefix = parsed?.prefix ?? '';
 	const visibleText = parsed?.visibleText || fallbackHeading;
-	const id = parsed?.target?.id ?? generateSafeId(visibleText);
+	const existingTarget = parsed?.targets.find(target => target.format === targetFormat) ?? parsed?.target;
+	const id = existingTarget?.id ?? generateSafeId(visibleText);
 	const linePrefix = prefix || line.match(/^(#{1,6}\s+)/)?.[1] || '';
 
 	return {
@@ -352,12 +404,29 @@ function updateHeadingLineText(line: string, newName: string, targetFormat: Targ
 	const parsed = parseHeadingLine(line);
 	if (!parsed) return null;
 
+	if (parsed.targets.length > 0) {
+		return buildHeadingLineWithTargets(parsed.prefix, newName, parsed.targets);
+	}
+
 	return buildHeadingLine(parsed.prefix, newName, parsed.target ? targetFormat : undefined, parsed.target?.id);
 }
 
 function getHeadingTargetIds(line: string): string[] {
 	const parsed = parseHeadingLine(line);
-	return parsed?.target?.id ? [parsed.target.id] : [];
+	return parsed ? uniqueValues(parsed.targets.map(target => target.id)) : [];
+}
+
+export function countMatchingHeadingVisibleText(editor: Editor, visibleHeading: string): number {
+	let count = 0;
+
+	for (let i = 0; i < editor.lineCount(); i++) {
+		const parsed = parseHeadingLine(editor.getLine(i));
+		if (parsed?.visibleText === visibleHeading) {
+			count++;
+		}
+	}
+
+	return count;
 }
 
 function getFilesInScope(app: App, file: TFile, scope: HeadingLinkSettings['renameScope']): TFile[] {
@@ -389,127 +458,313 @@ function getEncodedHeadingVariants(heading: string): string[] {
 	]);
 }
 
-function replaceHeadingTextReferences(data: string, oldName: string, newName: string): { data: string; count: number } {
-	let newData = data;
-	let count = 0;
-	const encodedNewHeading = encodeMarkdownLinkFragment(newName);
-	const wrappedNewHeading = escapeMarkdownLinkDestinationContent(newName);
+function isSameFile(a: TFile, b: TFile): boolean {
+	return a.path === b.path;
+}
 
-	const wikiLinkRegex = new RegExp(
-		`(\\[\\[[^\\]]*?#)${escapeRegex(oldName)}((?:\\]\\])|(?:\\|([^\\]]*)\\]\\]))`,
-		'g'
-	);
+function escapeHtmlText(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;');
+}
 
-	newData = newData.replace(wikiLinkRegex, (match, before: string, after: string, alias: string | undefined) => {
-		count++;
-		if (alias === oldName) {
-			return `${before}${newName}|${newName}]]`;
-		}
-		return `${before}${newName}${after}`;
+function splitLinesWithEndings(content: string): TextLine[] {
+	const lines: TextLine[] = [];
+	const endingRegex = /\r\n|[\n\v\f\r\x85\u2028\u2029]/g;
+	let lastIndex = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = endingRegex.exec(content)) !== null) {
+		lines.push({
+			text: content.substring(lastIndex, match.index),
+			ending: match[0]
+		});
+		lastIndex = endingRegex.lastIndex;
+	}
+
+	if (lastIndex < content.length || content.length === 0) {
+		lines.push({
+			text: content.substring(lastIndex),
+			ending: ''
+		});
+	}
+
+	return lines;
+}
+
+function joinLinesWithEndings(lines: TextLine[]): string {
+	return lines.map(line => `${line.text}${line.ending}`).join('');
+}
+
+function getReferenceTargetKind(subpath: string, headingName: string, targetIds: string[]): ReferenceTargetKind | null {
+	if (!subpath.startsWith('#')) return null;
+
+	const fragment = subpath.substring(1);
+	const decodedFragment = safeDecodeURIComponent(fragment);
+	const decodedTargetId = decodedFragment.startsWith('^') ? decodedFragment.substring(1) : decodedFragment;
+
+	if (targetIds.includes(decodedTargetId)) {
+		return 'stable-id';
+	}
+
+	if (getEncodedHeadingVariants(headingName).includes(fragment) || decodedFragment === headingName) {
+		return 'heading';
+	}
+
+	return null;
+}
+
+function resolveReferenceTargetKind(
+	app: App,
+	sourceFile: TFile,
+	targetFile: TFile,
+	linkPath: string,
+	subpath: string,
+	headingName: string,
+	targetIds: string[]
+): ReferenceTargetKind | null {
+	const targetKind = getReferenceTargetKind(subpath, headingName, targetIds);
+	if (!targetKind) return null;
+
+	const destinationFile = resolveInternalFile(app, linkPath, sourceFile);
+	if (!destinationFile || !isSameFile(destinationFile, targetFile)) return null;
+
+	return targetKind;
+}
+
+function getMarkdownDestinationParts(rawDestination: string): { path: string; subpath: string; wrapped: boolean } | null {
+	const stripped = stripDestinationWrapper(rawDestination);
+	if (isExternalDestination(stripped.destination)) return null;
+
+	const hashIndex = stripped.destination.indexOf('#');
+	if (hashIndex === -1) return null;
+
+	return {
+		path: stripped.destination.substring(0, hashIndex),
+		subpath: stripped.destination.substring(hashIndex),
+		wrapped: stripped.wrapped
+	};
+}
+
+function rewriteMarkdownDestinationHeading(rawDestination: string, newName: string): string {
+	const stripped = stripDestinationWrapper(rawDestination);
+	const hashIndex = stripped.destination.indexOf('#');
+	if (hashIndex === -1) return rawDestination;
+
+	const path = stripped.destination.substring(0, hashIndex);
+	const newFragment = stripped.wrapped
+		? escapeMarkdownLinkDestinationContent(newName)
+		: encodeMarkdownLinkFragment(newName);
+
+	return restoreDestinationWrapper(`${path}#${newFragment}`, stripped.wrapped);
+}
+
+function rewriteHtmlDestinationHeading(destination: string, newName: string): string {
+	const hashIndex = destination.indexOf('#');
+	if (hashIndex === -1) return destination;
+	return `${destination.substring(0, hashIndex)}#${encodeMarkdownLinkFragment(newName)}`;
+}
+
+function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+	return aStart < bEnd && bStart < aEnd;
+}
+
+function addResolvedReference(
+	line: string,
+	matches: ResolvedReferenceMatch[],
+	rewrites: ReferenceRewrite[],
+	match: ResolvedReferenceMatch,
+	replacement?: string
+): void {
+	if (matches.some(existing => rangesOverlap(existing.start, existing.end, match.start, match.end))) {
+		return;
+	}
+
+	matches.push(match);
+
+	if (replacement !== undefined && replacement !== line.substring(match.start, match.end)) {
+		rewrites.push({
+			start: match.start,
+			end: match.end,
+			replacement
+		});
+	}
+}
+
+function collectReferenceLineChanges(
+	app: App,
+	line: string,
+	sourceFile: TFile,
+	target: ReferenceTarget
+): { matches: ResolvedReferenceMatch[]; rewrites: ReferenceRewrite[] } {
+	const matches: ResolvedReferenceMatch[] = [];
+	const rewrites: ReferenceRewrite[] = [];
+
+	line.replace(/\[\[([^\]\n]+)\]\]/g, (match: string, body: string, offset: number) => {
+		const pipeIndex = body.indexOf('|');
+		const linkTarget = pipeIndex === -1 ? body : body.substring(0, pipeIndex);
+		const alias = pipeIndex === -1 ? undefined : body.substring(pipeIndex + 1);
+		const parsed = parseLinktext(linkTarget);
+		const targetKind = resolveReferenceTargetKind(app, sourceFile, target.file, parsed.path, parsed.subpath, target.oldName, target.targetIds);
+
+		if (!targetKind) return match;
+
+		const rewrittenTarget = targetKind === 'heading'
+			? replaceSubpath(linkTarget, `#${target.newName}`)
+			: linkTarget;
+		const rewrittenAlias = alias === target.oldName ? target.newName : alias;
+		const replacement = rewrittenAlias === undefined
+			? `[[${rewrittenTarget}]]`
+			: `[[${rewrittenTarget}|${rewrittenAlias}]]`;
+
+		addResolvedReference(line, matches, rewrites, {
+			start: offset,
+			end: offset + match.length,
+			kind: 'wikilink',
+			targetKind
+		}, replacement);
+
+		return match;
 	});
 
-	for (const oldEncoded of getEncodedHeadingVariants(oldName)) {
-		const mdLinkRegex = new RegExp(
-			`\\[([^\\]\\n]*)\\]\\((<[^>\\n]*?#|[^)\\n]*?#)${escapeRegex(oldEncoded)}(>)?\\)`,
-			'g'
-		);
-		const htmlLinkRegex = new RegExp(
-			`(<a[^>]*?href=["'][^"']*?#)${escapeRegex(oldEncoded)}(["'][^>]*>)([^<]*)(</a>)`,
-			'g'
-		);
+	line.replace(/\[([^\]\n]*)\]\((<[^>\n]+>|[^)\s\n]+)\)/g, (match: string, label: string, destination: string, offset: number) => {
+		const parts = getMarkdownDestinationParts(destination);
+		if (!parts) return match;
 
-		newData = newData.replace(mdLinkRegex, (match, alias: string, pathAndHash: string, wrappedEnd: string | undefined) => {
-			count++;
-			const newHeading = wrappedEnd ? wrappedNewHeading : encodedNewHeading;
-			if (alias === oldName) {
-				return `[${newName}](${pathAndHash}${newHeading}${wrappedEnd ?? ''})`;
-			}
-			return `[${alias}](${pathAndHash}${newHeading}${wrappedEnd ?? ''})`;
-		});
+		const targetKind = resolveReferenceTargetKind(app, sourceFile, target.file, parts.path, parts.subpath, target.oldName, target.targetIds);
+		if (!targetKind) return match;
 
-		newData = newData.replace(htmlLinkRegex, (match, beforeHref: string, afterHref: string, alias: string, endTag: string) => {
-			count++;
-			if (alias === oldName) {
-				return `${beforeHref}${encodedNewHeading}${afterHref}${newName}${endTag}`;
-			}
-			return `${beforeHref}${encodedNewHeading}${afterHref}${alias}${endTag}`;
-		});
-	}
+		const rewrittenLabel = label === target.oldName ? escapeMarkdownLinkText(target.newName) : label;
+		const rewrittenDestination = targetKind === 'heading'
+			? rewriteMarkdownDestinationHeading(destination, target.newName)
+			: destination;
+		const replacement = `[${rewrittenLabel}](${rewrittenDestination})`;
 
-	return { data: newData, count };
+		addResolvedReference(line, matches, rewrites, {
+			start: offset,
+			end: offset + match.length,
+			kind: 'markdown-link',
+			targetKind
+		}, replacement);
+
+		return match;
+	});
+
+	line.replace(/<a\b([^>]*?)\bhref=(["'])([^"']+)\2([^>]*)>([^<]*)<\/a>/gi, (
+		match: string,
+		beforeHref: string,
+		quote: string,
+		destination: string,
+		afterHref: string,
+		label: string,
+		offset: number
+	) => {
+		const parts = getMarkdownDestinationParts(destination);
+		if (!parts) return match;
+
+		const targetKind = resolveReferenceTargetKind(app, sourceFile, target.file, parts.path, parts.subpath, target.oldName, target.targetIds);
+		if (!targetKind) return match;
+
+		const rewrittenDestination = targetKind === 'heading'
+			? rewriteHtmlDestinationHeading(destination, target.newName)
+			: destination;
+		const rewrittenLabel = label === target.oldName ? escapeHtmlText(target.newName) : label;
+		const replacement = `<a${beforeHref}href=${quote}${rewrittenDestination}${quote}${afterHref}>${rewrittenLabel}</a>`;
+
+		addResolvedReference(line, matches, rewrites, {
+			start: offset,
+			end: offset + match.length,
+			kind: 'html-link',
+			targetKind
+		}, replacement);
+
+		return match;
+	});
+
+	return {
+		matches: matches.sort((a, b) => a.start - b.start),
+		rewrites
+	};
 }
 
-function replaceStableIdLinkAliases(data: string, targetIds: string[], oldName: string, newName: string): { data: string; count: number } {
-	let newData = data;
+export function getReferenceMatches(
+	app: App,
+	line: string,
+	sourceFile: TFile,
+	targetFile: TFile,
+	headingName: string,
+	targetIds: string[]
+): ResolvedReferenceMatch[] {
+	return collectReferenceLineChanges(app, line, sourceFile, {
+		file: targetFile,
+		oldName: headingName,
+		newName: headingName,
+		targetIds
+	}).matches;
+}
+
+export function rewriteReferenceLine(
+	app: App,
+	line: string,
+	sourceFile: TFile,
+	target: ReferenceTarget
+): ReferenceLineRewriteResult {
+	const { matches, rewrites } = collectReferenceLineChanges(app, line, sourceFile, target);
+
+	let rewrittenLine = line;
+	let count = 0;
+	for (const rewrite of rewrites.sort((a, b) => b.start - a.start)) {
+		rewrittenLine = `${rewrittenLine.substring(0, rewrite.start)}${rewrite.replacement}${rewrittenLine.substring(rewrite.end)}`;
+		count++;
+	}
+
+	return {
+		line: rewrittenLine,
+		count,
+		matches
+	};
+}
+
+export function rewriteReferencesInContent(
+	app: App,
+	sourceFile: TFile,
+	content: string,
+	target: ReferenceTarget
+): { data: string; count: number } {
+	const lines = splitLinesWithEndings(content);
 	let count = 0;
 
-	for (const id of targetIds) {
-		for (const fragment of [`#${id}`, `#^${id}`]) {
-			const escapedFragment = escapeRegex(fragment);
-			const wikiAliasRegex = new RegExp(`(\\[\\[[^\\]]*?${escapedFragment}\\|)${escapeRegex(oldName)}(\\]\\])`, 'g');
-			const mdAliasRegex = new RegExp(`\\[${escapeRegex(oldName)}\\](\\([^)]*?${escapedFragment}\\))`, 'g');
-			const htmlAliasRegex = new RegExp(`(<a[^>]*?href=["'][^"']*?${escapedFragment}["'][^>]*>)${escapeRegex(oldName)}(</a>)`, 'g');
-
-			newData = newData.replace(wikiAliasRegex, (match, before: string, after: string) => {
-				count++;
-				return `${before}${newName}${after}`;
-			});
-
-			newData = newData.replace(mdAliasRegex, (match, destination: string) => {
-				count++;
-				return `[${newName}]${destination}`;
-			});
-
-			newData = newData.replace(htmlAliasRegex, (match, before: string, after: string) => {
-				count++;
-				return `${before}${newName}${after}`;
-			});
-		}
+	for (const line of lines) {
+		const result = rewriteReferenceLine(app, line.text, sourceFile, target);
+		line.text = result.line;
+		count += result.count;
 	}
 
-	return { data: newData, count };
+	return {
+		data: count > 0 ? joinLinesWithEndings(lines) : content,
+		count
+	};
 }
 
-function findRegexMatches(line: string, regex: RegExp): { start: number; end: number }[] {
-	const matches: { start: number; end: number }[] = [];
-	let match: RegExpExecArray | null;
-	regex.lastIndex = 0;
-	while ((match = regex.exec(line)) !== null) {
-		matches.push({ start: match.index, end: match.index + match[0].length });
-		if (match[0].length === 0) regex.lastIndex++;
-	}
-	return matches;
-}
+export function rewriteReferencesInEditor(
+	app: App,
+	editor: Editor,
+	sourceFile: TFile,
+	target: ReferenceTarget
+): number {
+	let count = 0;
 
-function getReferenceMatches(line: string, headingName: string, targetIds: string[]): { start: number; end: number }[] {
-	const matches: { start: number; end: number }[] = [];
-
-	const wikiHeadingRegex = new RegExp(
-		`\\[\\[[^\\]]*?#${escapeRegex(headingName)}(?:(?:\\]\\])|(?:\\|[^\\]]*\\]\\]))`,
-		'g'
-	);
-	matches.push(...findRegexMatches(line, wikiHeadingRegex));
-
-	for (const encodedHeading of getEncodedHeadingVariants(headingName)) {
-		const mdHeadingRegex = new RegExp(`\\[[^\\]\\n]*\\]\\((?:<[^>\\n]*?#${escapeRegex(encodedHeading)}>|[^)\\n]*?#${escapeRegex(encodedHeading)})\\)`, 'g');
-		const htmlHeadingRegex = new RegExp(`<a[^>]*?href=["'][^"']*?#${escapeRegex(encodedHeading)}["'][^>]*>[^<]*</a>`, 'g');
-		matches.push(...findRegexMatches(line, mdHeadingRegex));
-		matches.push(...findRegexMatches(line, htmlHeadingRegex));
-	}
-
-	for (const id of targetIds) {
-		for (const fragment of [`#${id}`, `#^${id}`]) {
-			const escapedFragment = escapeRegex(fragment);
-			const wikiIdRegex = new RegExp(`\\[\\[[^\\]]*?${escapedFragment}(?:(?:\\]\\])|(?:\\|[^\\]]*\\]\\]))`, 'g');
-			const mdIdRegex = new RegExp(`\\[[^\\]]*\\]\\([^)]*?${escapedFragment}\\)`, 'g');
-			const htmlIdRegex = new RegExp(`<a[^>]*?href=["'][^"']*?${escapedFragment}["'][^>]*>[^<]*</a>`, 'g');
-			matches.push(...findRegexMatches(line, wikiIdRegex));
-			matches.push(...findRegexMatches(line, mdIdRegex));
-			matches.push(...findRegexMatches(line, htmlIdRegex));
+	for (let i = 0; i < editor.lineCount(); i++) {
+		const line = editor.getLine(i);
+		const result = rewriteReferenceLine(app, line, sourceFile, target);
+		if (result.line !== line) {
+			editor.setLine(i, result.line);
 		}
+		count += result.count;
 	}
 
-	return matches.sort((a, b) => a.start - b.start);
+	return count;
 }
 
 function splitLines(content: string): string[] {
@@ -669,12 +924,13 @@ function buildLineMigrationChange(
 	let reason: string | undefined;
 
 	const parsedHeading = parseHeadingLine(newLine);
-	if (parsedHeading?.target?.format === sourceFormat) {
-		const targetId = idMapByFile.get(file.path)?.get(parsedHeading.target.id);
+	const sourceTarget = parsedHeading?.targets.find(target => target.format === sourceFormat);
+	if (parsedHeading && sourceTarget) {
+		const targetId = idMapByFile.get(file.path)?.get(sourceTarget.id);
 		if (targetId) {
 			newLine = buildHeadingLine(parsedHeading.prefix, parsedHeading.visibleText, targetFormat, targetId);
 			addMigrationKind(kinds, 'heading');
-			addMigrationId(ids, parsedHeading.target.id);
+			addMigrationId(ids, sourceTarget.id);
 		}
 	}
 
@@ -762,14 +1018,17 @@ async function buildMigrationPlan(app: App, direction: ConversionDirection): Pro
 
 		for (const line of lines) {
 			const parsed = parseHeadingLine(line);
-			if (!parsed?.target || parsed.target.format !== sourceFormat || !isSafeTargetId(parsed.target.id)) continue;
+			const sourceTargets = parsed?.targets.filter(target => target.format === sourceFormat && isSafeTargetId(target.id)) ?? [];
+			if (sourceTargets.length === 0) continue;
 
 			let fileMap = idMapByFile.get(file.path);
 			if (!fileMap) {
 				fileMap = new Map<string, string>();
 				idMapByFile.set(file.path, fileMap);
 			}
-			fileMap.set(parsed.target.id, parsed.target.id);
+			for (const target of sourceTargets) {
+				fileMap.set(target.id, target.id);
+			}
 		}
 	}
 
@@ -832,7 +1091,7 @@ class RenameHeadingModal extends Modal {
 			.addButton((btn) => btn
 				.setButtonText('Rename')
 				.setCta()
-				.onClick(() => this.doRename()))
+				.onClick(() => void this.doRename()))
 			.addButton((btn) => btn
 				.setButtonText('Cancel')
 				.onClick(() => this.close()));
@@ -860,7 +1119,6 @@ class RenameHeadingModal extends Modal {
 			new Notice('Could not parse heading line.');
 			return;
 		}
-		this.editor.setLine(lineNum, newLine);
 
 		const filesToSearch = getFilesInScope(this.app, this.file, this.plugin.settings.renameScope);
 
@@ -868,28 +1126,28 @@ class RenameHeadingModal extends Modal {
 		let totalLinks = 0;
 		let totalFiles = 0;
 		const affectedFiles: string[] = [];
+		const failedFiles: string[] = [];
+		const target: ReferenceTarget = {
+			file: this.file,
+			oldName,
+			newName,
+			targetIds
+		};
+
+		this.editor.setLine(lineNum, newLine);
 
 		for (const f of filesToSearch) {
 			try {
 				let fileLinksUpdated = 0;
 
 				const updateData = (data: string): string => {
-					let result = replaceHeadingTextReferences(data, oldName, newName);
+					const result = rewriteReferencesInContent(this.app, f, data, target);
 					fileLinksUpdated += result.count;
-
-					if (targetIds.length > 0) {
-						result = replaceStableIdLinkAliases(result.data, targetIds, oldName, newName);
-						fileLinksUpdated += result.count;
-					}
-
 					return result.data;
 				};
 
-				if (f === this.file) {
-					const updatedEditorContent = updateData(this.editor.getValue());
-					if (fileLinksUpdated > 0) {
-						this.editor.setValue(updatedEditorContent);
-					}
+				if (isSameFile(f, this.file)) {
+					fileLinksUpdated = rewriteReferencesInEditor(this.app, this.editor, f, target);
 				} else {
 					await this.app.vault.process(f, updateData);
 				}
@@ -901,10 +1159,14 @@ class RenameHeadingModal extends Modal {
 				}
 			} catch (err) {
 				console.error(`Heading rename: failed to process ${f.path}`, err);
+				failedFiles.push(f.path);
 			}
 		}
 
-		if (totalLinks > 0) {
+		if (failedFiles.length > 0) {
+			const summary = `Heading renamed with ${failedFiles.length} file${failedFiles.length > 1 ? 's' : ''} skipped. Updated ${totalLinks} link${totalLinks === 1 ? '' : 's'} across ${totalFiles} file${totalFiles === 1 ? '' : 's'}.\nFailed:\n${failedFiles.join('\n')}`;
+			new Notice(summary, 10000);
+		} else if (totalLinks > 0) {
 			const summary = `Renamed heading. Updated ${totalLinks} link${totalLinks > 1 ? 's' : ''} across ${totalFiles} file${totalFiles > 1 ? 's' : ''}:\n${affectedFiles.join('\n')}`;
 			new Notice(summary, 8000);
 		} else {
@@ -992,7 +1254,7 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 					const line = lines[i];
 					currentHeading = getCurrentHeadingContext(line, currentHeading);
 
-					const matchData = getReferenceMatches(line, oldName, targetIds);
+						const matchData = getReferenceMatches(this.app, line, f, this.file, oldName, targetIds);
 
 					for (const m of matchData) {
 						const linesBefore = [];
@@ -1259,11 +1521,11 @@ class ConvertHeadingTargetFormatModal extends Modal {
 			let fileChanged = false;
 
 			await this.app.vault.process(file, (data) => {
-				const lines = splitLines(data);
+				const lines = splitLinesWithEndings(data);
 
 				for (const change of changes) {
-					if (lines[change.lineNum] === change.beforeLine) {
-						lines[change.lineNum] = change.afterLine;
+					if (lines[change.lineNum]?.text === change.beforeLine) {
+						lines[change.lineNum].text = change.afterLine;
 						fileChanged = true;
 						changedLines++;
 					} else {
@@ -1271,7 +1533,7 @@ class ConvertHeadingTargetFormatModal extends Modal {
 					}
 				}
 
-				return fileChanged ? lines.join('\n') : data;
+				return fileChanged ? joinLinesWithEndings(lines) : data;
 			});
 
 			if (fileChanged) {

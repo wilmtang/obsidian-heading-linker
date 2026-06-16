@@ -5,13 +5,14 @@
 		"inlineSources": true,
 		"module": "ESNext",
 		"target": "ESNext",
+		"allowImportingTsExtensions": true,
 		"allowJs": true,
 		"noImplicitAny": true,
 		"lib": [
 			"DOM",
 			"ESNext"
 		],
-		"moduleResolution": "node",
+		"moduleResolution": "bundler",
 		"importHelpers": true,
 		"isolatedModules": true,
 		"strict": true

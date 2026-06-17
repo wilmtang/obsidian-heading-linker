@@ -3,6 +3,12 @@
   "version": "1.0.7",
   "description": "A comprehensive heading utility: Copy markdown links to headings, safely rename headings (refactor), and search for heading references.",
   "main": "main.js",
+  "files": [
+    "main.js",
+    "manifest.json",
+    "styles.css",
+    "versions.json"
+  ],
   "scripts": {
     "build": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs --target=node16",
     "dev": "npm run build -- --watch",
@@ -10,10 +16,11 @@
     "test:integration": "vitest run test/integration",
     "test:e2e": "npm run build && wdio run ./wdio.conf.mts",
     "check:versions": "node scripts/check-versions.mjs",
+    "check:package-contents": "node scripts/check-package-contents.mjs",
     "lint:obsidian": "eslint main.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "check:release": "npm run check:versions && npm run typecheck && npm run lint:obsidian && npm test && npm run build && npm run typecheck:e2e && npm run test:e2e"
+    "check:release": "npm run check:versions && npm run typecheck && npm run lint:obsidian && npm test && npm run build && npm run check:package-contents && npm run typecheck:e2e && npm run test:e2e"
   },
   "keywords": [],
   "author": "",

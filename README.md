@@ -10,6 +10,20 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
 
 **Heading Linker and Refactor** solves this by providing a suite of advanced tools right in your editor's context menu.
 
+## See it in action
+
+### Copy resilient links, even for duplicate headings
+
+When a heading name appears more than once in the same note, the plugin automatically adds a stable block target and copies a link that will keep working after nearby text changes.
+
+<img src="images/demo-copy-link.gif" alt="Copying a heading link adds a stable block target for duplicate headings" width="760">
+
+### Find references and rename safely across the vault
+
+Search every note that points at a heading, jump through the matches, then rename the heading and update wiki links, markdown links, and matching aliases in one pass.
+
+<img src="images/demo-find-rename.gif" alt="Finding heading references and renaming the heading across linked notes" width="760">
+
 ## ✨ Features
 
 - 🔗 **Smart Linking**: Right-click any heading to copy a markdown link to it. If you have duplicate headings in the same file, the plugin automatically generates and inserts a stable target. Obsidian block IDs (e.g., `^heading-id`) are the default, with HTML anchors (e.g., `<a id="...">`) available as a web/export compatibility option.
@@ -38,6 +52,31 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
    
    <br>
    <img src="images/search-references.png" alt="Find References Modal" width="600">
+
+## Workflow screenshots
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="images/screenshot-stable-target.png" alt="Stable heading target added in Obsidian" width="100%">
+    </td>
+    <td width="50%">
+      <img src="images/screenshot-find-references-demo.png" alt="Find heading references modal with highlighted matches" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Stable targets</strong><br>Duplicate headings get reliable link anchors automatically.</td>
+    <td align="center"><strong>Reference search</strong><br>Matches show file names, surrounding context, and highlighted links.</td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <img src="images/screenshot-updated-references.png" alt="References updated after renaming a heading" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><strong>Vault-wide rename</strong><br>After a rename, linked notes are updated with the new heading destination and matching display text.</td>
+  </tr>
+</table>
 
 ## Link Generation and Reference Matching
 
@@ -182,7 +221,7 @@ The release process uses `manifest.json` as the source of truth. When the `versi
 
 1. Runs the Obsidian release checks.
 2. Creates and pushes a matching git tag if one does not already exist.
-3. Creates a GitHub release named after the manifest version with `main.js` and `manifest.json`.
+3. Creates a GitHub release named after the manifest version with `main.js`, `manifest.json`, `versions.json`, and `styles.css`.
 
 If the workflow cannot compare the current manifest version with the previous commit, it skips release creation instead of guessing. Bump `manifest.json` again on the default branch to start a release.
 

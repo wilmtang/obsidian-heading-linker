@@ -126,6 +126,7 @@ jobs:
           subject-path: |
             main.js
             manifest.json
+            versions.json
             styles.css
 
       - name: Create Release
@@ -135,6 +136,7 @@ jobs:
           tag_name: ${{ steps.release.outputs.tag_name }}
           name: ${{ steps.release.outputs.release_name }}
           target_commitish: ${{ github.sha }}
+          # Keep README media out of releases; only Obsidian runtime/version files belong here.
           files: |
             main.js
             manifest.json

@@ -332,6 +332,25 @@ export function unescapeMarkdownLinkText(value: string): string {
 	return value.replace(/\\([[\]\\])/g, '$1');
 }
 
+/**
+ * Wikilinks have no escaping mechanism for `|`, `]`, or line breaks, so a new
+ * heading name containing them cannot be represented safely inside `[[...]]`
+ * targets or aliases. Returns a user-facing reason when the name is unsafe to
+ * rename to, or null when it is safe.
+ */
+export function getUnsafeRenameReason(newName: string): string | null {
+	if (/[\r\n]/.test(newName)) {
+		return 'Heading name cannot contain line breaks.';
+	}
+	if (newName.includes('|')) {
+		return 'Heading name cannot contain "|" (it would break wiki links).';
+	}
+	if (newName.includes(']')) {
+		return 'Heading name cannot contain "]" (it would break wiki links).';
+	}
+	return null;
+}
+
 function formatMarkdownLinkDestination(destination: string): string {
 	return `<${escapeMarkdownLinkDestinationContent(destination)}>`;
 }
@@ -1222,6 +1241,11 @@ class RenameHeadingModal extends Modal {
 		// Validate
 		if (!newName) {
 			new Notice('Heading name cannot be empty.');
+			return;
+		}
+		const unsafeReason = getUnsafeRenameReason(newName);
+		if (unsafeReason) {
+			new Notice(unsafeReason);
 			return;
 		}
 		if (newName === oldName) {

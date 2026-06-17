@@ -42,6 +42,7 @@ import {
 	countMatchingHeadingVisibleText,
 	escapeMarkdownLinkText,
 	getReferenceMatches,
+	getUnsafeRenameReason,
 	parseHeadingLine,
 	rewriteReferencesInContent,
 	rewriteReferencesInEditor
@@ -198,6 +199,15 @@ describe('source-aware reference rewriting', () => {
 
 	it('escapes markdown link text when copied or rewritten', () => {
 		expect(escapeMarkdownLinkText('A [bracket] \\ path')).toBe('A \\[bracket\\] \\\\ path');
+	});
+
+	it('rejects rename targets that would corrupt wiki links', () => {
+		expect(getUnsafeRenameReason('Perfectly Fine')).toBeNull();
+		expect(getUnsafeRenameReason('Has [brackets')).toBeNull();
+		expect(getUnsafeRenameReason('Title: C# Notes')).toBeNull();
+		expect(getUnsafeRenameReason('a | b')).toMatch(/\|/);
+		expect(getUnsafeRenameReason('a ] b')).toMatch(/]/);
+		expect(getUnsafeRenameReason('a\nb')).toMatch(/line breaks/);
 	});
 
 	it('finds and rewrites markdown links whose label contains escaped brackets', () => {

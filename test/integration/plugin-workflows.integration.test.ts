@@ -189,6 +189,26 @@ describe('plugin workflow e2e', () => {
 		expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`[Same](<./Target.md#^${id}>)`);
 	});
 
+	it('does not insert a stable target when the clipboard write fails', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.stubGlobal('navigator', {
+			clipboard: { writeText: vi.fn().mockRejectedValue(new Error('clipboard denied')) }
+		});
+		const plugin = createPlugin();
+		const file = createFile('Target.md');
+		const editor = new MockEditor(['# Same', '## Same']);
+		const heading = {
+			heading: 'Same',
+			position: { start: { line: 1 }, end: { line: 1 } }
+		};
+
+		await plugin.copyHeadingLink(file as any, heading as any, editor as any);
+
+		// The document must be left untouched when the copy fails.
+		expect(editor.setLine).not.toHaveBeenCalled();
+		expect(editor.lines).toEqual(['# Same', '## Same']);
+	});
+
 	it('escapes both < and > when generating a link for a heading with angle brackets', async () => {
 		const plugin = createPlugin();
 		const file = createFile('Target.md');

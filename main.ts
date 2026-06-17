@@ -256,13 +256,16 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 		const isUnique = matchingHeadingCount === 1;
 
 		let fragment = "";
+		let pendingHeadingLine: string | null = null;
 		if (isUnique) {
 			fragment = visibleHeading;
 		} else {
 			const ensured = ensureHeadingTargetFormat(lineContent, visibleHeading, this.settings.duplicateHeadingTargetFormat);
 
 			if (ensured.line !== lineContent) {
-				editor.setLine(lineNum, ensured.line);
+				// Defer the in-document edit until the clipboard write succeeds, so a
+				// failed copy never leaves an orphan stable target behind.
+				pendingHeadingLine = ensured.line;
 			}
 
 			fragment = formatFragmentForTarget(this.settings.duplicateHeadingTargetFormat, ensured.id);
@@ -274,7 +277,19 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 		const markdownLink = `[${linkText}](${destination})`;
 
 		// 4. Write to Clipboard
-		await navigator.clipboard.writeText(markdownLink);
+		try {
+			await navigator.clipboard.writeText(markdownLink);
+		} catch (err) {
+			console.error('Heading link: failed to write to clipboard', err);
+			new Notice('Failed to copy heading link to clipboard.');
+			return;
+		}
+
+		// 5. Only mutate the document once the link is safely on the clipboard.
+		if (pendingHeadingLine !== null) {
+			editor.setLine(lineNum, pendingHeadingLine);
+		}
+
 		new Notice('Heading link copied to clipboard!');
 	}
 }

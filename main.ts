@@ -861,7 +861,11 @@ export async function renameHeadingReferences(
 }
 
 function splitLines(content: string): string[] {
-	return content.split(/\r\n|[\n\v\f\r\x85\u2028\u2029]/);
+	// Derive from splitLinesWithEndings so read-time scanning (migration plan,
+	// reference search) segments lines identically to write-time application,
+	// which splits with splitLinesWithEndings. This keeps planned line indices
+	// aligned with the lines they are later applied against.
+	return splitLinesWithEndings(content).map(line => line.text);
 }
 
 function isExternalDestination(destination: string): boolean {

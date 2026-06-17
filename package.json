@@ -13,7 +13,7 @@
     "lint:obsidian": "eslint main.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "check:release": "npm run check:versions && npm run typecheck && npm run lint:obsidian && npm test && npm run build"
+    "check:release": "npm run check:versions && npm run typecheck && npm run lint:obsidian && npm test && npm run build && npm run typecheck:e2e && npm run test:e2e"
   },
   "keywords": [],
   "author": "",

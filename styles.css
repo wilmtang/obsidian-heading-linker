@@ -1,0 +1,111 @@
+/*
+ * Heading Linker and Refactor styles.
+ * Obsidian loads this file automatically when the plugin is enabled.
+ * Colors use Obsidian CSS variables so the plugin follows the active theme.
+ */
+
+/* Rename heading modal */
+.hlc-rename-input {
+	width: 100%;
+}
+
+/* Find references modal — suggestion rows */
+.hlc-ref-title {
+	margin-bottom: 4px;
+}
+
+.hlc-ref-file {
+	font-weight: 600;
+	color: var(--text-accent);
+}
+
+.hlc-ref-sep {
+	color: var(--text-muted);
+	margin: 0 4px;
+}
+
+.hlc-ref-context-heading {
+	font-style: italic;
+	color: var(--text-normal);
+	background-color: var(--background-secondary);
+	padding: 0 4px;
+	border-radius: 4px;
+	font-size: 0.9em;
+}
+
+.hlc-ref-context {
+	font-size: 0.85em;
+	line-height: 1.4;
+}
+
+.hlc-ref-context-line {
+	color: var(--text-muted);
+	opacity: 0.7;
+	white-space: pre-wrap;
+}
+
+.hlc-ref-match-line {
+	color: var(--text-normal);
+	white-space: pre-wrap;
+}
+
+.hlc-ref-match {
+	color: var(--text-normal);
+	background-color: var(--text-selection);
+	border-radius: 2px;
+}
+
+/* Convert target format modal */
+.hlc-convert-summary {
+	margin: 12px 0;
+	color: var(--text-muted);
+}
+
+.hlc-convert-filter {
+	width: 100%;
+	box-sizing: border-box;
+	margin-bottom: 8px;
+}
+
+.hlc-convert-list {
+	max-height: 420px;
+	overflow: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 6px;
+}
+
+.hlc-convert-empty {
+	color: var(--text-muted);
+	padding: 8px;
+}
+
+.hlc-convert-item {
+	padding: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.hlc-convert-item-head {
+	font-weight: 600;
+	color: var(--text-accent);
+	margin-bottom: 4px;
+}
+
+.hlc-convert-before {
+	white-space: pre-wrap;
+	color: var(--text-muted);
+	font-size: 0.85em;
+}
+
+.hlc-convert-after {
+	white-space: pre-wrap;
+	color: var(--text-normal);
+	font-size: 0.85em;
+	margin-top: 2px;
+}
+
+.hlc-convert-reason {
+	color: var(--text-warning);
+	font-size: 0.85em;
+	margin-top: 2px;
+}

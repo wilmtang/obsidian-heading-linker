@@ -1219,7 +1219,7 @@ class RenameHeadingModal extends Modal {
 				text.setValue(this.newName);
 				text.onChange((value) => { this.newName = value; });
 				text.inputEl.select();
-				text.inputEl.setCssStyles({ width: '100%' });
+				text.inputEl.addClass('hlc-rename-input');
 				text.inputEl.addEventListener('keydown', (e) => {
 					if (e.key === 'Enter') { e.preventDefault(); void this.doRename(); }
 				});
@@ -1415,20 +1415,20 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 	}
 
 	renderSuggestion(ref: HeadingReference, el: HTMLElement) {
-		const titleEl = el.createEl('div', { attr: { style: 'margin-bottom: 4px;' } });
-		titleEl.createEl('span', { text: ref.file.basename, attr: { style: 'font-weight: 600; color: var(--text-accent);' } });
+		const titleEl = el.createEl('div', { cls: 'hlc-ref-title' });
+		titleEl.createEl('span', { text: ref.file.basename, cls: 'hlc-ref-file' });
 		if (ref.contextHeading) {
-			titleEl.createEl('span', { text: ' - ', attr: { style: 'color: var(--text-muted); margin: 0 4px;' } });
-			titleEl.createEl('span', { text: ref.contextHeading, attr: { style: 'font-style: italic; color: var(--text-normal); background-color: var(--background-secondary); padding: 0 4px; border-radius: 4px; font-size: 0.9em;' } });
+			titleEl.createEl('span', { text: ' - ', cls: 'hlc-ref-sep' });
+			titleEl.createEl('span', { text: ref.contextHeading, cls: 'hlc-ref-context-heading' });
 		}
 
-		const contextEl = el.createEl('div', { attr: { style: 'font-size: 0.85em; line-height: 1.4;' } });
+		const contextEl = el.createEl('div', { cls: 'hlc-ref-context' });
 
 		for (const line of ref.linesBefore) {
-			contextEl.createEl('div', { text: line, attr: { style: 'color: var(--text-muted); opacity: 0.7; white-space: pre-wrap;' } });
+			contextEl.createEl('div', { text: line, cls: 'hlc-ref-context-line' });
 		}
 
-		const lineEl = contextEl.createEl('div', { attr: { style: 'color: var(--text-normal); white-space: pre-wrap;' } });
+		const lineEl = contextEl.createEl('div', { cls: 'hlc-ref-match-line' });
 
 		const beforeMatch = ref.lineText.substring(0, ref.matchStartIndex);
 		const theMatch = ref.lineText.substring(ref.matchStartIndex, ref.matchEndIndex);
@@ -1437,13 +1437,13 @@ class FindReferencesModal extends SuggestModal<HeadingReference> {
 		if (beforeMatch.length > 0) {
 			lineEl.appendChild(activeDocument.createTextNode(beforeMatch));
 		}
-		lineEl.createEl('mark', { text: theMatch, attr: { style: 'color: var(--text-normal); background-color: var(--text-selection); border-radius: 2px;' } });
+		lineEl.createEl('mark', { text: theMatch, cls: 'hlc-ref-match' });
 		if (afterMatch.length > 0) {
 			lineEl.appendChild(activeDocument.createTextNode(afterMatch));
 		}
 
 		for (const line of ref.linesAfter) {
-			contextEl.createEl('div', { text: line, attr: { style: 'color: var(--text-muted); opacity: 0.7; white-space: pre-wrap;' } });
+			contextEl.createEl('div', { text: line, cls: 'hlc-ref-context-line' });
 		}
 	}
 
@@ -1484,26 +1484,18 @@ class ConvertHeadingTargetFormatModal extends Modal {
 					await this.rescan();
 				}));
 
-		this.summaryEl = contentEl.createEl('div', {
-			attr: {
-				style: 'margin: 12px 0; color: var(--text-muted);'
-			}
-		});
+		this.summaryEl = contentEl.createEl('div', { cls: 'hlc-convert-summary' });
 
 		this.filterInput = contentEl.createEl('input', {
+			cls: 'hlc-convert-filter',
 			attr: {
 				type: 'search',
-				placeholder: 'Filter planned changes...',
-				style: 'width: 100%; box-sizing: border-box; margin-bottom: 8px;'
+				placeholder: 'Filter planned changes...'
 			}
 		});
 		this.filterInput.addEventListener('input', () => this.renderItems());
 
-		this.listEl = contentEl.createEl('div', {
-			attr: {
-				style: 'max-height: 420px; overflow: auto; border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 6px;'
-			}
-		});
+		this.listEl = contentEl.createEl('div', { cls: 'hlc-convert-list' });
 
 		new Setting(contentEl)
 			.addButton((btn) => {
@@ -1573,37 +1565,33 @@ class ConvertHeadingTargetFormatModal extends Modal {
 		if (items.length === 0) {
 			this.listEl.createEl('div', {
 				text: 'No matching planned changes.',
-				attr: { style: 'color: var(--text-muted); padding: 8px;' }
+				cls: 'hlc-convert-empty'
 			});
 			return;
 		}
 
 		for (const change of items) {
-			const itemEl = this.listEl.createEl('div', {
-				attr: {
-					style: 'padding: 8px; border-bottom: 1px solid var(--background-modifier-border);'
-				}
-			});
+			const itemEl = this.listEl.createEl('div', { cls: 'hlc-convert-item' });
 
 			itemEl.createEl('div', {
 				text: `${change.file.path}:${change.lineNum + 1} - ${change.kinds.join(', ')}`,
-				attr: { style: 'font-weight: 600; color: var(--text-accent); margin-bottom: 4px;' }
+				cls: 'hlc-convert-item-head'
 			});
 
 			itemEl.createEl('div', {
 				text: change.beforeLine,
-				attr: { style: 'white-space: pre-wrap; color: var(--text-muted); font-size: 0.85em;' }
+				cls: 'hlc-convert-before'
 			});
 
 			if (change.afterLine !== undefined) {
 				itemEl.createEl('div', {
 					text: change.afterLine,
-					attr: { style: 'white-space: pre-wrap; color: var(--text-normal); font-size: 0.85em; margin-top: 2px;' }
+					cls: 'hlc-convert-after'
 				});
 			} else {
 				itemEl.createEl('div', {
 					text: change.reason ?? 'Skipped',
-					attr: { style: 'color: var(--text-warning); font-size: 0.85em; margin-top: 2px;' }
+					cls: 'hlc-convert-reason'
 				});
 			}
 		}

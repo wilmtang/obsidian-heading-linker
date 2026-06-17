@@ -132,6 +132,7 @@ jobs:
           subject-path: |
             main.js
             manifest.json
+            styles.css
 
       - name: Create Release
         if: steps.release.outputs.should_release == 'true' && steps.existing-release.outputs.exists != 'true'
@@ -144,6 +145,7 @@ jobs:
             main.js
             manifest.json
             versions.json
+            styles.css
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -76,6 +76,19 @@ If the duplicate target format is set to HTML anchors, it uses an anchor ID inst
 [Duplicate heading](<./Note.md#duplicate-heading-a1b2c3>)
 ```
 
+### Special characters in headings
+
+Headings often contain characters that are meaningful to markdown or wikilink syntax. Generated links escape them so the link stays valid **and** remains findable and renamable later:
+
+- Brackets `[` and `]` are escaped in the link label (for example, the heading `A [x]` copies as `[A \[x\]](<./Note.md#A [x]>)`).
+- Angle brackets `<` and `>` are escaped inside the wrapped destination (for example, `#A \< B \> C`).
+- Backslashes are escaped in the label.
+
+These links round-trip correctly: **Find heading references...** and **Rename this heading...** detect them and update both the destination and a display label that matches the old heading name.
+
+> [!NOTE]
+> When **renaming** a heading, the new name cannot contain `|`, `]`, or line breaks. Obsidian wikilinks (`[[Note#Heading|alias]]`) have no way to escape these characters, so the rename modal rejects such names with a notice rather than writing a broken link. You can still rename a heading that already contains them *to* a safe name.
+
 ### Finding heading references
 
 When you choose **Find heading references...**, the plugin scans markdown files in the selected scope and matches the heading by visible text and by any stable target IDs on the heading line.
@@ -134,7 +147,7 @@ You can install this plugin directly from the Obsidian Community Plugins store:
 [Heading Linker and Refactor](https://community.obsidian.md/plugins/heading-link-copy)
 
 ### Manual Installation
-1. Download the latest release (`main.js` and `manifest.json`) from the [Releases](https://github.com/wilmtang/obsidian-heading-linker/releases) page.
+1. Download the latest release (`main.js`, `manifest.json`, and `styles.css`) from the [Releases](https://github.com/wilmtang/obsidian-heading-linker/releases) page.
 2. Create a folder named `obsidian-heading-linker` in your vault's `.obsidian/plugins/` directory.
 3. Place the downloaded files in that folder.
 4. Restart Obsidian, go to **Settings > Community Plugins**, disable "Safe Mode", and enable **Heading Linker and Refactor**.
@@ -155,7 +168,7 @@ npm run build
 - `npm test`: Runs focused unit tests for link detection and rewrite behavior.
 - `npm run test:integration`: Runs workflow tests against fake Obsidian app, vault, file, and editor services.
 - `npm run test:e2e`: Launches a sandboxed desktop Obsidian instance through WebdriverIO and tests the packaged plugin in a real vault.
-- `npm run check:versions`: Verifies `manifest.json` and `package.json` use the same version.
+- `npm run check:versions`: Verifies `manifest.json` and `package.json` use the same version, and that `versions.json` maps that version to the manifest's `minAppVersion`.
 - `npm run typecheck`: Runs TypeScript validation without emitting files.
 - `npm run typecheck:e2e`: Runs TypeScript validation for the WebdriverIO Obsidian e2e config and specs.
 - `npm run lint:obsidian`: Runs the local Obsidian release linter checks.

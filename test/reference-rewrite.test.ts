@@ -181,6 +181,45 @@ describe('source-aware reference rewriting', () => {
 		expect(escapeMarkdownLinkText('A [bracket] \\ path')).toBe('A \\[bracket\\] \\\\ path');
 	});
 
+	it('finds and rewrites markdown links whose label contains escaped brackets', () => {
+		const { app, files } = createMockApp(['A.md', 'Notes/Source.md']);
+		const sourceFile = files.get('Notes/Source.md')!;
+		const targetFile = files.get('A.md')!;
+		// What the plugin itself generates for a heading named "A [x]":
+		// the label is escaped, the destination fragment is raw inside <...>.
+		const content = '[A \\[x\\]](<./A.md#A [x]>)';
+
+		const matches = getReferenceMatches(app as any, content, sourceFile as any, targetFile as any, 'A [x]', []);
+		const result = rewriteReferencesInContent(app as any, sourceFile as any, content, {
+			file: targetFile as any,
+			oldName: 'A [x]',
+			newName: 'B [y]',
+			targetIds: []
+		});
+
+		expect(matches.map(match => match.kind)).toEqual(['markdown-link']);
+		expect(result.count).toBe(1);
+		expect(result.data).toBe('[B \\[y\\]](<./A.md#B [y]>)');
+	});
+
+	it('updates an escaped display label that renders as the old heading name', () => {
+		const { app, files } = createMockApp(['A.md', 'Notes/Source.md']);
+		const sourceFile = files.get('Notes/Source.md')!;
+		const targetFile = files.get('A.md')!;
+		// Heading "A \ B": label escapes the backslash, destination keeps it raw.
+		const content = '[A \\\\ B](<./A.md#A \\ B>)';
+
+		const result = rewriteReferencesInContent(app as any, sourceFile as any, content, {
+			file: targetFile as any,
+			oldName: 'A \\ B',
+			newName: 'Renamed',
+			targetIds: []
+		});
+
+		expect(result.count).toBe(1);
+		expect(result.data).toBe('[Renamed](<./A.md#Renamed>)');
+	});
+
 	it('counts duplicate headings from live editor lines', () => {
 		const editor = {
 			lineCount: () => 4,

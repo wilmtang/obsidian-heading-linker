@@ -313,6 +313,10 @@ export function escapeMarkdownLinkText(value: string): string {
 		.replace(/\]/g, '\\]');
 }
 
+export function unescapeMarkdownLinkText(value: string): string {
+	return value.replace(/\\([[\]\\])/g, '$1');
+}
+
 function formatMarkdownLinkDestination(destination: string): string {
 	return `<${escapeMarkdownLinkDestinationContent(destination)}>`;
 }
@@ -639,14 +643,14 @@ function collectReferenceLineChanges(
 		return match;
 	});
 
-	line.replace(/\[([^\]\n]*)\]\((<(?:\\[^\n]|[^>\\\n])+>|[^)\s\n]+)\)/g, (match: string, label: string, destination: string, offset: number) => {
+	line.replace(/\[((?:\\.|[^\]\\\n])*)\]\((<(?:\\[^\n]|[^>\\\n])+>|[^)\s\n]+)\)/g, (match: string, label: string, destination: string, offset: number) => {
 		const parts = getMarkdownDestinationParts(destination);
 		if (!parts) return match;
 
 		const targetKind = resolveReferenceTargetKind(app, sourceFile, target.file, parts.path, parts.subpath, target.oldName, target.targetIds);
 		if (!targetKind) return match;
 
-		const rewrittenLabel = label === target.oldName ? escapeMarkdownLinkText(target.newName) : label;
+		const rewrittenLabel = unescapeMarkdownLinkText(label) === target.oldName ? escapeMarkdownLinkText(target.newName) : label;
 		const rewrittenDestination = targetKind === 'heading'
 			? rewriteMarkdownDestinationHeading(destination, target.newName)
 			: destination;
@@ -1043,7 +1047,7 @@ function buildLineMigrationChange(
 		return `[[${rewrite.target}${alias}]]`;
 	});
 
-	newLine = newLine.replace(/(\[[^\]\n]*\]\()(<(?:\\[^\n]|[^>\\\n])+>|[^)\s\n]+)(\))/g, (match, before: string, destination: string, after: string) => {
+	newLine = newLine.replace(/(\[(?:\\.|[^\]\\\n])*\]\()(<(?:\\[^\n]|[^>\\\n])+>|[^)\s\n]+)(\))/g, (match, before: string, destination: string, after: string) => {
 		const rewrite = maybeRewriteMarkdownDestination(app, destination, file, idMapByFile, direction);
 
 		if (!rewrite) return match;

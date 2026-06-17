@@ -299,11 +299,11 @@ function safeDecodeURIComponent(value: string): string {
 }
 
 function escapeMarkdownLinkDestinationContent(value: string): string {
-	return value.replace(/>/g, '\\>');
+	return value.replace(/[<>]/g, '\\$&');
 }
 
 function unescapeMarkdownLinkDestinationContent(value: string): string {
-	return value.replace(/\\>/g, '>');
+	return value.replace(/\\([<>])/g, '$1');
 }
 
 export function escapeMarkdownLinkText(value: string): string {

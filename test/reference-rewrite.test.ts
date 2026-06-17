@@ -177,6 +177,25 @@ describe('source-aware reference rewriting', () => {
 		expect(result.data).toBe('[C > D](<./Target \\> File.md#C \\> D>)');
 	});
 
+	it('recognizes and rewrites markdown destinations with escaped less-than signs', () => {
+		const { app, files } = createMockApp(['A.md', 'Notes/Source.md']);
+		const sourceFile = files.get('Notes/Source.md')!;
+		const targetFile = files.get('A.md')!;
+		const content = '[A < B](<./A.md#A \\< B>)';
+
+		const matches = getReferenceMatches(app as any, content, sourceFile as any, targetFile as any, 'A < B', []);
+		const result = rewriteReferencesInContent(app as any, sourceFile as any, content, {
+			file: targetFile as any,
+			oldName: 'A < B',
+			newName: 'C < D',
+			targetIds: []
+		});
+
+		expect(matches.map(match => match.kind)).toEqual(['markdown-link']);
+		expect(result.count).toBe(1);
+		expect(result.data).toBe('[C < D](<./A.md#C \\< D>)');
+	});
+
 	it('escapes markdown link text when copied or rewritten', () => {
 		expect(escapeMarkdownLinkText('A [bracket] \\ path')).toBe('A \\[bracket\\] \\\\ path');
 	});

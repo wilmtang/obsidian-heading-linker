@@ -189,6 +189,20 @@ describe('plugin workflow e2e', () => {
 		expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`[Same](<./Target.md#^${id}>)`);
 	});
 
+	it('escapes both < and > when generating a link for a heading with angle brackets', async () => {
+		const plugin = createPlugin();
+		const file = createFile('Target.md');
+		const editor = new MockEditor(['# A < B > C']);
+		const heading = {
+			heading: 'A < B > C',
+			position: { start: { line: 0 }, end: { line: 0 } }
+		};
+
+		await plugin.copyHeadingLink(file as any, heading as any, editor as any);
+
+		expect(navigator.clipboard.writeText).toHaveBeenCalledWith('[A < B > C](<./Target.md#A \\< B \\> C>)');
+	});
+
 	it('renames references across an open note and vault files without touching unrelated headings', async () => {
 		const { app, contentByPath, files } = createVault({
 			'Target.md': '# Intro\n[[Target#Intro]]\n[[Other#Intro]]\n[Intro](<Target.md#Intro>)',

@@ -2,6 +2,7 @@ import {
 	App,
 	ButtonComponent,
 	Editor,
+	EditorPosition,
 	HeadingCache,
 	MarkdownFileInfo,
 	MarkdownView,
@@ -287,7 +288,9 @@ export default class HeadingLinkCopierPlugin extends Plugin {
 
 		// 5. Only mutate the document once the link is safely on the clipboard.
 		if (pendingHeadingLine !== null) {
+			const restoreSelections = preserveEditorSelections(editor);
 			editor.setLine(lineNum, pendingHeadingLine);
+			restoreSelections();
 		}
 
 		new Notice('Heading link copied to clipboard!');
@@ -796,6 +799,40 @@ export function rewriteReferencesInContent(
 	};
 }
 
+function clampPositionToEditor(editor: Editor, pos: EditorPosition): EditorPosition {
+	const lastLine = Math.max(editor.lineCount() - 1, 0);
+	const line = Math.min(Math.max(pos.line, 0), lastLine);
+	const lineLength = editor.getLine(line)?.length ?? 0;
+	const ch = Math.min(Math.max(pos.ch, 0), lineLength);
+	return { line, ch };
+}
+
+/**
+ * Snapshots the editor's current selection(s) and returns a restore function.
+ * Rewriting heading and reference lines via setLine causes CodeMirror to remap
+ * the cursor through those changes, which makes it jump; restoring the snapshot
+ * afterwards keeps the caret where the user left it. Positions are clamped in
+ * case the edited lines became shorter.
+ */
+function preserveEditorSelections(editor: Editor): () => void {
+	if (typeof editor.listSelections !== 'function' || typeof editor.setSelections !== 'function') {
+		return () => {};
+	}
+
+	const selections = editor.listSelections().map((sel) => ({
+		anchor: { line: sel.anchor.line, ch: sel.anchor.ch },
+		head: { line: sel.head.line, ch: sel.head.ch }
+	}));
+
+	return () => {
+		if (selections.length === 0) return;
+		editor.setSelections(selections.map((sel) => ({
+			anchor: clampPositionToEditor(editor, sel.anchor),
+			head: clampPositionToEditor(editor, sel.head)
+		})));
+	};
+}
+
 export function rewriteReferencesInEditor(
 	app: App,
 	editor: Editor,
@@ -1272,6 +1309,7 @@ class RenameHeadingModal extends Modal {
 			targetIds
 		};
 
+		const restoreSelections = preserveEditorSelections(this.editor);
 		this.editor.setLine(lineNum, newLine);
 		const {
 			totalLinks,
@@ -1279,6 +1317,7 @@ class RenameHeadingModal extends Modal {
 			affectedFiles,
 			failedFiles
 		} = await renameHeadingReferences(this.app, this.editor, target, filesToSearch);
+		restoreSelections();
 
 		if (failedFiles.length > 0) {
 			const summary = `Heading renamed with ${failedFiles.length} file${failedFiles.length > 1 ? 's' : ''} skipped. Updated ${totalLinks} link${totalLinks === 1 ? '' : 's'} across ${totalFiles} file${totalFiles === 1 ? '' : 's'}.\nFailed:\n${failedFiles.join('\n')}`;

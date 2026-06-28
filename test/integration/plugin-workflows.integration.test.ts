@@ -223,6 +223,50 @@ describe('plugin workflow e2e', () => {
 		expect(navigator.clipboard.writeText).toHaveBeenCalledWith('[A < B > C](<./Target.md#A \\< B \\> C>)');
 	});
 
+	it('preserves an existing other-format marker when copying a duplicate heading', async () => {
+		const plugin = createPlugin();
+		const file = createFile('Target.md');
+		const editor = new MockEditor([
+			'# Same',
+			'## Same <a id="same-web"></a>'
+		]);
+		const heading = {
+			heading: 'Same',
+			position: { start: { line: 1 }, end: { line: 1 } }
+		};
+
+		await plugin.copyHeadingLink(file as any, heading as any, editor as any);
+
+		const updatedLine = editor.lines[1];
+		const blockId = updatedLine.match(/\^([A-Za-z0-9-]+)$/)?.[1];
+		expect(blockId).toMatch(/^same-/);
+		// The pre-existing HTML anchor must survive alongside the new block id.
+		expect(updatedLine).toBe(`## Same <a id="same-web"></a> ^${blockId}`);
+		expect(editor.setLine).toHaveBeenCalledWith(1, updatedLine);
+		expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`[Same](<./Target.md#^${blockId}>)`);
+	});
+
+	it('reuses a matching-format marker without dropping unrelated markers', async () => {
+		const plugin = createPlugin();
+		const file = createFile('Target.md');
+		const editor = new MockEditor([
+			'# Same',
+			'## Same <a id="same-web"></a> ^same-block'
+		]);
+		const heading = {
+			heading: 'Same',
+			position: { start: { line: 1 }, end: { line: 1 } }
+		};
+
+		await plugin.copyHeadingLink(file as any, heading as any, editor as any);
+
+		// The heading already carries a block id, so nothing is rewritten and both
+		// markers stay in place.
+		expect(editor.setLine).not.toHaveBeenCalled();
+		expect(editor.lines[1]).toBe('## Same <a id="same-web"></a> ^same-block');
+		expect(navigator.clipboard.writeText).toHaveBeenCalledWith('[Same](<./Target.md#^same-block>)');
+	});
+
 	it('renames references across an open note and vault files without touching unrelated headings', async () => {
 		const { app, contentByPath, files } = createVault({
 			'Target.md': '# Intro\n[[Target#Intro]]\n[[Other#Intro]]\n[Intro](<Target.md#Intro>)',

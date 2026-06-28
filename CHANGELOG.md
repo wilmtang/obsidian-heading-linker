@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Copying a heading link no longer leaves a stray block ID behind if the copy
   fails.** The document is only modified after the clipboard write succeeds, and
   a failed copy now shows a clear notice instead of silently doing nothing.
+- **Copying a link to a duplicate heading no longer drops other stable markers on
+  that heading.** Previously, copying a link to a duplicate heading that already
+  carried a marker of a different format (for example an `<a id="...">` anchor
+  when the setting is block IDs) rebuilt the line with a single marker, deleting
+  the others and breaking any links that pointed at them. Existing markers are
+  now preserved, matching the behaviour of **Convert Heading Link Target Format**.
 
 ### Changed
 

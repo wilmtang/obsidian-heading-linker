@@ -1,7 +1,7 @@
 # Bug Audit
 
 Date: 2026-06-15
-Last updated: 2026-06-16
+Last updated: 2026-06-27
 
 Scope: full repository pass over `main.ts`, tests, WebdriverIO e2e setup, release workflow, TypeScript/ESLint config, and version/release scripts.
 
@@ -24,8 +24,9 @@ All commands passed locally. The e2e run passed against Obsidian v1.12.7 with in
 | P1 | Rename, find references, and migration rewrite links inside code examples | Deferred / no fix planned for rename/find | Renaming and finding links inside code blocks is acceptable for current behavior. Migration behavior remains documented as part of the same scanner limitation. | n/a |
 | P2 | Generated links containing escaped `>` are not recognized later | Fixed | Wrapped markdown destinations are parsed with escaped characters, normalized before matching, and re-escaped when rewritten; regression covers `>` in headings and filenames. | `25caca8` |
 | P2 | Markdown link labels that render as the old heading can remain stale | Open | Needs a fix that compares rendered/unescaped markdown labels before deciding whether to update the label. | n/a |
-| P2 | Wikilink rewrites can create broken links for new names containing wikilink syntax characters | Open | Needs validation or safe construction for wikilink heading fragments and aliases containing `|`, `]]`, newlines, and related syntax characters. | n/a |
+| P2 | Wikilink rewrites can create broken links for new names containing wikilink syntax characters | Fixed | The rename modal now rejects new names containing `|`, `]`, or line breaks via `getUnsafeRenameReason` before any link is written. | n/a |
 | P2 | Target-format migration can drop extra stable markers from headings | Fixed | Migration converts source-format markers in place while preserving unrelated stable markers; regression covers mixed marker headings in both directions. | `4ee1bd3` |
+| P2 | Copying a duplicate heading link can drop extra stable markers from the heading | Fixed | The copy path preserves existing markers and only adds a marker of the configured format when one is missing; regression covers a duplicate heading with a different-format anchor. | n/a |
 | P3 | Relative copy mode may create ambiguous or non-portable links | Fixed as terminology / behavior retained | The UI and README now call `./filename.md` mode "Basename" so it no longer implies a source-relative path. | `7f27b53` |
 | P3 | GitHub Actions does not run the WebdriverIO e2e suite | Fixed | CI caches `.obsidian-cache/`, typechecks e2e files, and runs WebdriverIO through `xvfb-run`. | `8a18413` |
 
@@ -136,23 +137,46 @@ Compare the rendered/unescaped markdown label with `oldName`, then rewrite the l
 
 ### P2: Wikilink rewrites can create broken links for new names containing wikilink syntax characters
 
-Status: Open. No fix has been applied yet.
+Status: Fixed. The rename modal now rejects unsafe new names up front rather than writing a broken wikilink.
 
 Affected code:
 
-- `main.ts:620` replaces wikilink subpaths with raw `target.newName`.
-- `main.ts:623` writes aliases with raw `target.newName`.
+- `getUnsafeRenameReason` (`main.ts`) rejects new names containing `|`, `]`, `\r`, or `\n`.
+- `RenameHeadingModal.doRename` calls it after `trim()` and shows the returned reason as a notice, aborting before any link is rewritten.
 
-The rename modal allows arbitrary heading names after `trim()`. If the new heading contains characters meaningful to wikilinks, such as `|`, `]]`, or a newline, a rewritten link like `[[Target#A | B|A | B]]` can become ambiguous or broken.
+The rename modal previously allowed arbitrary heading names after `trim()`. If the new heading contained characters meaningful to wikilinks, such as `|`, `]]`, or a newline, a rewritten link like `[[Target#A | B|A | B]]` could become ambiguous or broken.
 
-Impact:
+Impact (before fix):
 
-- Renaming a heading to text that is valid Markdown heading content can produce invalid or mis-targeted wikilinks.
+- Renaming a heading to text that is valid Markdown heading content could produce invalid or mis-targeted wikilinks.
 - Markdown links are safer because label text is escaped, but wikilinks have no equivalent escaping here.
 
-Suggested fix:
+Implemented fix:
 
-Validate or encode wikilink heading fragments and aliases before writing them. If Obsidian has a helper for linktext construction, prefer it over string concatenation. Add tests for `|`, `]`, and newline rejection/handling.
+Reject `|`, `]`, and line breaks in the rename modal before constructing any link. Names that already contain those characters can still be renamed *to* a safe name. Unit tests cover the rejection reasons.
+
+### P2: Copying a duplicate heading link can drop extra stable markers from the heading
+
+Status: Fixed. The copy path now preserves every existing marker and only adds a marker of the configured format when one is missing.
+
+Affected code:
+
+- `ensureHeadingTargetFormat` (`main.ts`) is invoked from `copyHeadingLink` only for duplicate (non-unique) headings.
+
+This is the copy-path analogue of the migration marker-drop bug (fixed in `4ee1bd3` for `convertHeadingTargets`). Previously `ensureHeadingTargetFormat` rebuilt the heading with a single marker via `buildHeadingLine`:
+
+- A heading carrying both a block id and an HTML anchor (for example `## Intro <a id="intro-a"></a> ^intro-b`) lost the marker that did not match the configured format.
+- A heading carrying only a different-format marker (for example `## Intro <a id="intro-a"></a>` with the block-id setting) had its anchor replaced by a block marker reusing the anchor's id, so existing `#intro-a` anchor links broke.
+
+Because this only triggers for duplicate headings, it was easy to miss and is not covered by the migration regression tests.
+
+Impact (before fix):
+
+- Existing stable links could break the next time a user copied a link to an already-marked duplicate heading.
+
+Implemented fix:
+
+Preserve `parsed.targets` and only append a new marker of the configured format when none exists, deduplicating with `uniqueTargetMarkers` and rebuilding via `buildHeadingLineWithTargets`. Integration tests cover a duplicate heading with a different-format anchor (marker preserved, new block id added) and a duplicate heading that already has a matching-format marker (no rewrite, all markers kept).
 
 ### P2: Target-format migration can drop extra stable markers from headings
 
@@ -239,5 +263,3 @@ Recommended next tests:
 
 - Heading parsing edge cases: indented ATX headings and closing hash headings.
 - Rename/find/migration behavior around fenced code blocks and inline code.
-- Markdown label alias rewrites for escaped label text.
-- Wikilink rewrites for new heading names containing `|`, `]`, `#`, and newline.

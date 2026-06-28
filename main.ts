@@ -440,14 +440,28 @@ function buildHeadingLineWithTargets(prefix: string, visibleText: string, target
 
 function ensureHeadingTargetFormat(line: string, fallbackHeading: string, targetFormat: TargetMarkerFormat): { line: string; id: string } {
 	const parsed = parseHeadingLine(line);
-	const prefix = parsed?.prefix ?? '';
 	const visibleText = parsed?.visibleText || fallbackHeading;
-	const existingTarget = parsed?.targets.find(target => target.format === targetFormat) ?? parsed?.target;
-	const id = existingTarget?.id ?? generateSafeId(visibleText);
-	const linePrefix = prefix || line.match(/^(#{1,6}\s+)/)?.[1] || '';
+	const linePrefix = parsed?.prefix || line.match(/^(#{1,6}\s+)/)?.[1] || '';
+	const existingTargets = parsed?.targets ?? [];
 
+	const existingTarget = existingTargets.find(target => target.format === targetFormat);
+	if (existingTarget) {
+		// A stable target of the requested format already exists. Reuse its id
+		// and preserve every existing marker so other-format anchors on the same
+		// heading are not dropped.
+		return {
+			line: buildHeadingLineWithTargets(linePrefix, visibleText, uniqueTargetMarkers(existingTargets)),
+			id: existingTarget.id
+		};
+	}
+
+	// No marker of the requested format yet. Add a fresh one while keeping any
+	// existing markers (e.g. a different-format anchor) intact, so links that
+	// point at those markers keep resolving.
+	const id = generateSafeId(visibleText);
+	const targets = uniqueTargetMarkers([...existingTargets, { format: targetFormat, id }]);
 	return {
-		line: buildHeadingLine(linePrefix, visibleText, targetFormat, id),
+		line: buildHeadingLineWithTargets(linePrefix, visibleText, targets),
 		id
 	};
 }

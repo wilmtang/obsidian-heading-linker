@@ -10,6 +10,15 @@ As your vault grows, headings become powerful anchors for your thoughts. But Obs
 
 **Heading Linker and Refactor** solves this by providing a suite of advanced tools right in your editor's context menu.
 
+## ✨ Features
+
+- 🔗 **Smart Linking**: Right-click any heading to copy a markdown link to it. If you have duplicate headings in the same file, the plugin automatically generates and inserts a stable target. Obsidian block IDs (e.g., `^heading-id`) are the default, with HTML anchors (e.g., `<a id="...">`) available as a web/export compatibility option.
+- 📝 **Safe Renaming**: Right-click a heading and select "Rename this heading...". The plugin will safely rename the heading and instantly update every single link pointing to it (Wiki, Markdown, and HTML links) across your file, folder, or entire vault. It even intelligently updates display aliases that match the old heading name.
+- 🔎 **Find References**: Need to know everywhere a heading is mentioned? Click "Find heading references..." to open a beautifully formatted search modal. See the exact context of each mention and jump straight to the source.
+- ⚡ **Lightning Fast Refactor**: Press `Shift + Enter` right inside the "Find References" modal to instantly rename the heading and all its references across your vault!
+- ⚙️ **Customizable Settings**: Choose between relative or full vault link paths, and configure the default scope for renaming headings (Entire Vault, Current Folder, or Current File).
+- ⌨️ **Keyboard Shortcuts (Hotkeys)**: Bind custom keyboard shortcuts for all three commands (Copy, Rename, and Find References) that trigger only when editing a heading line!
+
 ## See it in action
 
 ### Copy resilient links, even for duplicate headings
@@ -23,15 +32,6 @@ When a heading name appears more than once in the same note, the plugin automati
 Search every note that points at a heading, jump through the matches, then rename the heading and update wiki links, markdown links, and matching aliases in one pass.
 
 <img src="images/demo-find-rename.gif" alt="Finding heading references and renaming the heading across linked notes" width="760">
-
-## ✨ Features
-
-- 🔗 **Smart Linking**: Right-click any heading to copy a markdown link to it. If you have duplicate headings in the same file, the plugin automatically generates and inserts a stable target. Obsidian block IDs (e.g., `^heading-id`) are the default, with HTML anchors (e.g., `<a id="...">`) available as a web/export compatibility option.
-- 📝 **Safe Renaming**: Right-click a heading and select "Rename this heading...". The plugin will safely rename the heading and instantly update every single link pointing to it (Wiki, Markdown, and HTML links) across your file, folder, or entire vault. It even intelligently updates display aliases that match the old heading name.
-- 🔎 **Find References**: Need to know everywhere a heading is mentioned? Click "Find heading references..." to open a beautifully formatted search modal. See the exact context of each mention and jump straight to the source.
-- ⚡ **Lightning Fast Refactor**: Press `Shift + Enter` right inside the "Find References" modal to instantly rename the heading and all its references across your vault!
-- ⚙️ **Customizable Settings**: Choose between relative or full vault link paths, and configure the default scope for renaming headings (Entire Vault, Current Folder, or Current File).
-- ⌨️ **Keyboard Shortcuts (Hotkeys)**: Bind custom keyboard shortcuts for all three commands (Copy, Rename, and Find References) that trigger only when editing a heading line!
 
 ## 🛠️ How to Use
 
